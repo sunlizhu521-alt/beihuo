@@ -30,7 +30,7 @@ const DETAIL_COLUMNS = [
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
   { key: "materialCode", label: "物料编码" },
-  { key: "materialCodeValid", label: "物料编码是否正确" },
+  { key: "materialCodeValid", label: "采购分工明细是否存在" },
   { key: "materialName", label: "物料名称" },
   { key: "quantity", label: "数量" },
 ];
@@ -335,7 +335,7 @@ async function buildDemandAllocationRows(records) {
     return rows.slice(headerIndex + 1).map((row, rowOffset) => {
       const applicant = getCellValue(row, columnMap.applicant);
       const materialCode = getCellValue(row, columnMap.materialCode);
-      const quantity = getCellValue(row, columnMap.quantity);
+      const quantity = getDemandRowQuantity(row, columnMap);
       const oaProcessNo = getCellValue(row, columnMap.oaProcessNo);
       if (!materialCode && !applicant && !quantity && !oaProcessNo) return null;
 
@@ -552,6 +552,18 @@ function normalizeDemandHeader(value) {
 function getCellValue(row, columnIndex) {
   if (columnIndex === undefined || columnIndex < 0) return "";
   return String(row?.[columnIndex] ?? "").trim();
+}
+
+function getDemandRowQuantity(row, columnMap) {
+  const mappedQuantity = getCellValue(row, columnMap.quantity);
+  if (mappedQuantity) return mappedQuantity;
+  const materialIndex = columnMap.materialCode ?? -1;
+  const candidateIndexes = row
+    .map((value, index) => ({ value: getCellValue(row, index), index }))
+    .filter((cell) => cell.index !== materialIndex && cell.index > materialIndex && parseDemandQuantity(cell.value) > 0)
+    .map((cell) => cell.index);
+  if (!candidateIndexes.length) return "";
+  return getCellValue(row, candidateIndexes.at(-1));
 }
 
 function normalizeLookupKey(value) {
