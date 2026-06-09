@@ -219,7 +219,7 @@ async function applyAllSlots() {
   const targetSlotIds = slots
     .filter((slot) => {
       const record = state.records.get(slot.id);
-      return record?.pendingFile || (record && !record.applied);
+      return record?.pendingFile || record?.file;
     })
     .map((slot) => slot.id);
 
@@ -231,7 +231,7 @@ async function applyAllSlots() {
       if (applied === false) throw new Error("应用刷新失败");
     }
     await refresh();
-    setLibraryState(targetSlotIds.length ? "已刷新应用" : "暂无待应用文件");
+    setLibraryState(targetSlotIds.length ? "已强制刷新应用" : "暂无可应用文件");
   } catch (error) {
     console.warn("apply all failed", error);
     setLibraryState(error.message || "刷新应用失败");
@@ -649,7 +649,7 @@ function renderSlot(slot) {
           <input type="file" accept="${TABLE_FILE_ACCEPT}" data-upload="${slot.id}" />
           上传/替换
         </label>
-        <button type="button" data-apply="${slot.id}" ${hasPending || (record && !record.applied) ? "" : "disabled"}>应用刷新</button>
+        <button type="button" data-apply="${slot.id}" ${record?.pendingFile || record?.file ? "" : "disabled"}>应用刷新</button>
         <button class="danger-button" type="button" data-delete="${slot.id}" ${record ? "" : "disabled"}>删除</button>
       </div>
     </article>
@@ -891,11 +891,7 @@ function countAppliedRecords() {
 }
 
 function updateApplyAllButton() {
-  const hasAnyRecordToApply = slots.some((slot) => {
-    const record = state.records.get(slot.id);
-    return record?.pendingFile || (record && !record.applied);
-  });
-  if (els.applyAllButton) els.applyAllButton.disabled = !hasAnyRecordToApply;
+  if (els.applyAllButton) els.applyAllButton.disabled = false;
 }
 
 function setLibraryState(text) {
