@@ -26,6 +26,7 @@ const FILTER_DEFINITIONS = [
 const DETAIL_COLUMNS = [
   { key: "purchaseGroup", label: "采购组" },
   { key: "buyer", label: "采购单订单下单人" },
+  { key: "businessUnit", label: "事业部" },
   { key: "applicant", label: "申请人" },
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
@@ -869,6 +870,7 @@ function getExportColumnWidth(key) {
   return {
     purchaseGroup: 14,
     buyer: 18,
+    businessUnit: 16,
     applicant: 14,
     supplierShortName: 20,
     oaProcessNo: 20,
