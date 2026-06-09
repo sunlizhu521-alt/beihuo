@@ -40,7 +40,7 @@ const TABLE_FIELD_ALIASES = {
   demandApplicant: ["创建人", "申请人", "OA申请人", "流程申请人"],
   demandMaterialCode: ["识别码", "物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
   demandProcessNo: ["流程号", "流程编号", "OA备货流程号", "OA流程号", "备货流程号", "备货需求流程号", "OA编号", "OA单号", "单号"],
-  demandQuantity: ["数量"],
+  demandQuantity: ["数量", "备货数量", "申请数量", "需求数量", "申请备货数量", "下单数量", "下单数量-备货需求OA申请为准", "下单数量-备货需求-OA申请为准"],
   divisionPurchaseGroup: ["采购组", "采购分组", "采购组别", "采购分组名称"],
   divisionMaterialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
   divisionBuyer: ["采购单订单下单人", "采购订单下单人", "采购下单人", "采购单下单人", "订单下单人", "下单人", "采购员", "采购负责人", "采购对接人", "采购组对接人"],
@@ -329,7 +329,7 @@ async function buildDemandAllocationRows(records) {
       oaProcessNo: TABLE_FIELD_ALIASES.demandProcessNo,
       quantity: TABLE_FIELD_ALIASES.demandQuantity,
     });
-    columnMap.quantity = findExactHeaderColumnIndex(rows[headerIndex], "数量");
+    columnMap.quantity = findExactHeaderColumnIndex(rows[headerIndex], "数量") ?? columnMap.quantity;
     if (columnMap.materialCode === undefined) return [];
 
     return rows.slice(headerIndex + 1).map((row, rowOffset) => {
