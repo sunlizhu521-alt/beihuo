@@ -64,6 +64,7 @@ const els = {
   uploadedCount: document.querySelector("#uploadedCount"),
   appliedCount: document.querySelector("#appliedCount"),
   beihuoTotal: document.querySelector("#beihuoTotal"),
+  quantityTotal: document.querySelector("#quantityTotal"),
   supplierCount: document.querySelector("#supplierCount"),
   filterToolbar: document.querySelector("#filterToolbar"),
   clearFiltersButton: document.querySelector("#clearFiltersButton"),
@@ -727,6 +728,7 @@ function updateDemandMetrics() {
     : state.filteredRows.length;
   const supplierCount = new Set(state.filteredRows.flatMap((row) => splitMultiValue(row.supplierShortName))).size;
   if (els.beihuoTotal) els.beihuoTotal.textContent = formatMetricNumber(total);
+  if (els.quantityTotal) els.quantityTotal.textContent = `数量合计：${formatMetricNumber(total)}`;
   if (els.supplierCount) els.supplierCount.textContent = formatMetricNumber(supplierCount);
   if (els.downloadDetailButton) els.downloadDetailButton.disabled = !state.filteredRows.length || !window.XLSX;
 }
