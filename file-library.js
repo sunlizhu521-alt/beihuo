@@ -335,7 +335,8 @@ async function buildDemandAllocationRows(records) {
     return rows.slice(headerIndex + 1).map((row, rowOffset) => {
       const applicant = getCellValue(row, columnMap.applicant);
       const materialCode = getCellValue(row, columnMap.materialCode);
-      const quantity = getDemandRowQuantity(row, columnMap);
+      const quantityNumber = getDemandRowQuantity(row, columnMap);
+      const quantity = Number.isFinite(quantityNumber) ? formatPlainNumber(quantityNumber) : "";
       const oaProcessNo = getCellValue(row, columnMap.oaProcessNo);
       if (!materialCode && !applicant && !quantity && !oaProcessNo) return null;
 
@@ -361,7 +362,7 @@ async function buildDemandAllocationRows(records) {
         materialCodeValid: divisionIndex.materialCodes.has(materialKey) ? "是" : "否",
         materialName: category.materialName || "",
         quantity,
-        quantityNumber: parseDemandQuantity(quantity),
+        quantityNumber,
         sourceFile: source.fileName,
         sourceSheet: source.sheetName,
         sourceSlotId: source.slotId,
@@ -555,15 +556,13 @@ function getCellValue(row, columnIndex) {
 }
 
 function getDemandRowQuantity(row, columnMap) {
-  const mappedQuantity = getCellValue(row, columnMap.quantity);
-  if (mappedQuantity) return mappedQuantity;
+  const mappedQuantity = forceDemandNumber(row?.[columnMap.quantity]);
+  if (Number.isFinite(mappedQuantity)) return mappedQuantity;
   const materialIndex = columnMap.materialCode ?? -1;
-  const candidateIndexes = row
-    .map((value, index) => ({ value: getCellValue(row, index), index }))
-    .filter((cell) => cell.index !== materialIndex && cell.index > materialIndex && parseDemandQuantity(cell.value) > 0)
-    .map((cell) => cell.index);
-  if (!candidateIndexes.length) return "";
-  return getCellValue(row, candidateIndexes.at(-1));
+  const candidates = row
+    .map((value, index) => ({ value: forceDemandNumber(value), index }))
+    .filter((cell) => cell.index !== materialIndex && Number.isFinite(cell.value) && cell.value > 0);
+  return candidates.length ? candidates.at(-1).value : NaN;
 }
 
 function normalizeLookupKey(value) {
@@ -585,10 +584,20 @@ function joinUnique(values) {
 }
 
 function parseDemandQuantity(value) {
+  return forceDemandNumber(value);
+}
+
+function forceDemandNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
   const match = String(value ?? "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
   if (!match) return NaN;
   const number = Number(match[0]);
   return Number.isFinite(number) ? number : NaN;
+}
+
+function formatPlainNumber(value) {
+  if (!Number.isFinite(value)) return "";
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
 }
 
 function isSupportedTableFile(fileName) {
