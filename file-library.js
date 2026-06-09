@@ -561,7 +561,13 @@ function getCellValue(row, columnIndex) {
 }
 
 function getDemandRowQuantity(row, columnMap) {
-  return forceDemandNumber(row?.[columnMap.quantity]);
+  const mappedQuantity = forceDemandNumber(row?.[columnMap.quantity]);
+  if (Number.isFinite(mappedQuantity)) return mappedQuantity;
+  const materialIndex = columnMap.materialCode ?? -1;
+  const candidates = row
+    .map((value, index) => ({ value: forceDemandNumber(value), index }))
+    .filter((cell) => cell.index !== materialIndex && Number.isFinite(cell.value) && cell.value > 0);
+  return candidates.length ? candidates.at(-1).value : NaN;
 }
 
 function normalizeLookupKey(value) {

@@ -530,7 +530,7 @@ h2 {
   position: relative;
   z-index: 70;
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(6, minmax(96px, 1fr));
   gap: 8px;
   align-items: start;
   overflow: visible;
@@ -547,8 +547,8 @@ h2 {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  min-height: 42px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
@@ -643,11 +643,16 @@ h2 {
   position: relative;
   z-index: 70;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, auto);
   gap: 8px;
   align-items: start;
   margin-bottom: 14px;
   overflow: visible;
+}
+
+.detail-filter-row > button {
+  min-width: 86px;
+  padding: 0 10px;
 }
 
 .detail-actions {
