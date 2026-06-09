@@ -530,7 +530,7 @@ h2 {
   position: relative;
   z-index: 70;
   display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
   gap: 8px;
   align-items: start;
   overflow: visible;

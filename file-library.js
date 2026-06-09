@@ -19,6 +19,7 @@ const SLOT_IDS = {
 const FILTER_DEFINITIONS = [
   { key: "businessUnit", label: "事业部" },
   { key: "productLine", label: "销售产品线" },
+  { key: "salesSeries", label: "销售系列" },
   { key: "purchaseGroup", label: "采购组" },
   { key: "buyer", label: "采购订单下单人" },
   { key: "supplierShortName", label: "供应商简称" },
@@ -37,6 +38,7 @@ const DETAIL_COLUMNS = [
 ];
 const TABLE_FIELD_ALIASES = {
   productLine: ["销售产品线", "产品线", "一级产品线", "销售线"],
+  salesSeries: ["销售系列", "系列", "产品系列", "销售产品系列"],
   purchaseGroup: ["采购分组", "采购组", "采购组别", "采购分组名称"],
   demandApplicant: ["创建人", "申请人", "OA申请人", "流程申请人"],
   demandMaterialCode: ["识别码", "物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
@@ -353,6 +355,7 @@ async function buildDemandAllocationRows(records) {
       return {
         businessUnit: rosterIndex.byName.get(normalizeLookupKey(applicant)) || "",
         productLine: category.productLine || "",
+        salesSeries: category.salesSeries || "",
         purchaseGroup,
         buyer,
         applicant,
@@ -424,11 +427,12 @@ function sheetToRows(sheet) {
 function buildCategoryIndex(tables) {
   const byMaterial = new Map();
   tables.forEach(({ rows }) => {
-    const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码", "销售产品线", "采购分组", "采购组", "金蝶名称"]);
+    const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码", "销售产品线", "销售系列", "采购分组", "采购组", "金蝶名称"]);
     const columnMap = headerIndex >= 0
       ? buildColumnMapByAliases(rows[headerIndex], {
         materialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
         productLine: TABLE_FIELD_ALIASES.productLine,
+        salesSeries: TABLE_FIELD_ALIASES.salesSeries,
         purchaseGroup: TABLE_FIELD_ALIASES.purchaseGroup,
         materialName: ["金蝶名称", "物料名称", "物料名", "商品名称", "品名", "产品名称"],
       })
@@ -440,6 +444,7 @@ function buildCategoryIndex(tables) {
       if (!materialKey) return;
       byMaterial.set(materialKey, {
         productLine: getCellValue(row, columnMap.productLine ?? 6),
+        salesSeries: getCellValue(row, columnMap.salesSeries ?? 7),
         purchaseGroup: getCellValue(row, 21) || getCellValue(row, columnMap.purchaseGroup),
         materialName: getCellValue(row, columnMap.materialName ?? 3),
       });
