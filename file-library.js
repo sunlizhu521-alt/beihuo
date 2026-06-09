@@ -10,6 +10,12 @@ const slots = [
 ];
 
 const TABLE_FILE_ACCEPT = ".xlsx,.xls,.xlsm,.csv";
+const SLOT_IDS = {
+  category: "file-1",
+  purchaseDivision: "file-2",
+  roster: "file-3",
+  demand: "file-4",
+};
 const FILTER_DEFINITIONS = [
   { key: "businessUnit", label: "事业部" },
   { key: "productLine", label: "销售产品线" },
@@ -24,22 +30,21 @@ const DETAIL_COLUMNS = [
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
   { key: "materialCode", label: "物料编码" },
-  { key: "sku", label: "SKU" },
+  { key: "materialCodeValid", label: "物料编码是否正确" },
   { key: "materialName", label: "物料名称" },
   { key: "quantity", label: "数量" },
 ];
-const FIELD_ALIASES = {
-  businessUnit: ["事业部", "业务单元", "业务部门", "部门"],
+const TABLE_FIELD_ALIASES = {
   productLine: ["销售产品线", "产品线", "一级产品线", "销售线"],
-  purchaseGroup: ["采购组", "采购分组", "采购组别", "采购分组名称"],
-  buyer: ["采购单订单下单人", "采购订单下单人", "采购单下单人", "订单下单人", "下单人"],
-  applicant: ["申请人", "OA申请人", "流程申请人"],
-  supplierShortName: ["供应商简称", "供应商", "供应商名称", "供应商短名称"],
-  oaProcessNo: ["OA备货流程号", "OA流程号", "备货流程号", "流程号", "OA编号"],
-  materialCode: ["物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
-  sku: ["SKU", "sku", "Sku"],
-  materialName: ["物料名称", "物料名", "商品名称", "品名", "产品名称"],
-  quantity: ["数量", "备货数量", "申请数量", "下单数量", "下单数量-备货需求OA申请为准"],
+  purchaseGroup: ["采购分组", "采购组", "采购组别", "采购分组名称"],
+  demandApplicant: ["创建人", "申请人", "OA申请人", "流程申请人"],
+  demandMaterialCode: ["识别码", "物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
+  demandProcessNo: ["流程号", "OA备货流程号", "OA流程号", "备货流程号", "OA编号"],
+  demandQuantity: ["数量", "备货数量", "申请数量", "下单数量", "下单数量-备货需求OA申请为准"],
+  divisionPurchaseGroup: ["采购组", "采购分组", "采购组别", "采购分组名称"],
+  divisionMaterialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
+  divisionBuyer: ["采购单订单下单人", "采购订单下单人", "采购下单人", "采购单下单人", "订单下单人", "下单人"],
+  divisionSupplier: ["供应商简称", "供应商", "供应商名称", "供应商短名称"],
 };
 
 const els = {
@@ -273,11 +278,14 @@ async function refreshDemandDashboard() {
     return;
   }
 
-  const records = slots
-    .map((slot) => state.records.get(slot.id))
-    .filter((record) => record?.applied && record?.file && isSupportedTableFile(record.name));
+  const records = Object.fromEntries(
+    Object.entries(SLOT_IDS).map(([key, slotId]) => {
+      const record = state.records.get(slotId);
+      return [key, record?.applied && record?.file && isSupportedTableFile(record.name) ? record : null];
+    })
+  );
 
-  if (!records.length) {
+  if (!records.demand) {
     state.demandRows = [];
     state.filteredRows = [];
     resetAllFilterState();
@@ -285,32 +293,103 @@ async function refreshDemandDashboard() {
     return;
   }
 
-  const results = await Promise.all(
-    records.map(async (record) => {
-      try {
-        return await readDemandRowsFromRecord(record);
-      } catch (error) {
-        console.warn("read demand file failed", record?.name, error);
-        return [];
-      }
-    })
-  );
-
-  state.demandRows = results.flat();
+  try {
+    state.demandRows = await buildDemandAllocationRows(records);
+  } catch (error) {
+    console.warn("build demand allocation failed", error);
+    state.demandRows = [];
+  }
   rebuildFilterOptions();
   pruneFilterSelections();
   renderDemandDashboard();
 }
 
-async function readDemandRowsFromRecord(record) {
+async function buildDemandAllocationRows(records) {
+  const [categoryRows, divisionRows, rosterRows, demandRows] = await Promise.all([
+    readTableRows(records.category, "Dim-YL医疗器械商品分类"),
+    readTableRows(records.purchaseDivision),
+    readTableRows(records.roster),
+    readTableRows(records.demand),
+  ]);
+  const categoryIndex = buildCategoryIndex(categoryRows);
+  const divisionIndex = buildPurchaseDivisionIndex(divisionRows);
+  const rosterIndex = buildRosterIndex(rosterRows);
+
+  return demandRows.flatMap(({ rows, source }) => {
+    const headerIndex = findHeaderRowIndex(rows, [
+      ...TABLE_FIELD_ALIASES.demandApplicant,
+      ...TABLE_FIELD_ALIASES.demandMaterialCode,
+      ...TABLE_FIELD_ALIASES.demandProcessNo,
+      ...TABLE_FIELD_ALIASES.demandQuantity,
+    ]);
+    if (headerIndex < 0) return [];
+    const columnMap = buildColumnMapByAliases(rows[headerIndex], {
+      applicant: TABLE_FIELD_ALIASES.demandApplicant,
+      materialCode: TABLE_FIELD_ALIASES.demandMaterialCode,
+      oaProcessNo: TABLE_FIELD_ALIASES.demandProcessNo,
+      quantity: TABLE_FIELD_ALIASES.demandQuantity,
+    });
+    if (columnMap.materialCode === undefined) return [];
+
+    return rows.slice(headerIndex + 1).map((row, rowOffset) => {
+      const applicant = getCellValue(row, columnMap.applicant);
+      const materialCode = getCellValue(row, columnMap.materialCode);
+      const quantity = getCellValue(row, columnMap.quantity);
+      const oaProcessNo = getCellValue(row, columnMap.oaProcessNo);
+      if (!materialCode && !applicant && !quantity && !oaProcessNo) return null;
+
+      const materialKey = normalizeLookupKey(materialCode);
+      const category = categoryIndex.byMaterial.get(materialKey) || {};
+      const purchaseGroup = category.purchaseGroup || "";
+      const groupMaterialKey = makeGroupMaterialKey(purchaseGroup, materialCode);
+      const groupDivisionRows = divisionIndex.byGroupMaterial.get(groupMaterialKey) || [];
+      const materialDivisionRows = divisionIndex.byMaterial.get(materialKey) || [];
+      const buyer = joinUnique(groupDivisionRows.map((item) => item.buyer));
+      const supplierShortName = joinUnique(materialDivisionRows.map((item) => item.supplierShortName));
+
+      return {
+        businessUnit: rosterIndex.byName.get(normalizeLookupKey(applicant)) || "",
+        productLine: category.productLine || "",
+        purchaseGroup,
+        buyer,
+        applicant,
+        supplierShortName,
+        oaProcessNo,
+        materialCode,
+        materialCodeValid: divisionIndex.materialCodes.has(materialKey) ? "是" : "否",
+        materialName: category.materialName || "",
+        quantity,
+        quantityNumber: parseDemandQuantity(quantity),
+        sourceFile: source.fileName,
+        sourceSheet: source.sheetName,
+        sourceSlotId: source.slotId,
+        sourceRowNumber: headerIndex + rowOffset + 2,
+      };
+    }).filter(Boolean);
+  });
+}
+
+async function readTableRows(record, preferredSheetName = "") {
+  if (!record) return [];
   const workbook = await readWorkbook(record.file);
-  return (workbook.SheetNames || []).flatMap((sheetName) =>
-    extractDemandRowsFromSheet(workbook.Sheets[sheetName], {
+  const sheetNames = getOrderedSheetNames(workbook, preferredSheetName);
+  return sheetNames.map((sheetName) => ({
+    rows: sheetToRows(workbook.Sheets[sheetName]),
+    source: {
       fileName: record.name,
       slotId: record.id,
       sheetName,
-    })
-  );
+    },
+  })).filter((table) => table.rows.length);
+}
+
+function getOrderedSheetNames(workbook, preferredSheetName) {
+  const sheetNames = workbook.SheetNames || [];
+  if (!preferredSheetName) return sheetNames;
+  const preferred = sheetNames.find((sheetName) => sheetName === preferredSheetName)
+    || sheetNames.find((sheetName) => sheetName.includes(preferredSheetName));
+  if (!preferred) return sheetNames;
+  return [preferred, ...sheetNames.filter((sheetName) => sheetName !== preferred)];
 }
 
 async function readWorkbook(file) {
@@ -329,37 +408,104 @@ async function readWorkbook(file) {
   });
 }
 
-function extractDemandRowsFromSheet(sheet, source) {
+function sheetToRows(sheet) {
   if (!sheet) return [];
-  const rows = window.XLSX.utils.sheet_to_json(sheet, {
+  return window.XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: "",
     blankrows: false,
     raw: false,
   });
-  const headerIndex = findDemandHeaderRowIndex(rows);
-  if (headerIndex < 0) return [];
-
-  const columnMap = buildDemandColumnMap(rows[headerIndex]);
-  return rows.slice(headerIndex + 1).map((row, rowOffset) => {
-    const item = Object.fromEntries(Object.keys(FIELD_ALIASES).map((key) => [key, getDemandCellValue(row, columnMap[key])]));
-    const hasDetailValue = DETAIL_COLUMNS.some((column) => item[column.key]);
-    const hasFilterValue = FILTER_DEFINITIONS.some((filter) => item[filter.key]);
-    if (!hasDetailValue && !hasFilterValue) return null;
-    item.quantityNumber = parseDemandQuantity(item.quantity);
-    item.sourceFile = source.fileName;
-    item.sourceSheet = source.sheetName;
-    item.sourceSlotId = source.slotId;
-    item.sourceRowNumber = headerIndex + rowOffset + 2;
-    return item;
-  }).filter(Boolean);
 }
 
-function findDemandHeaderRowIndex(rows) {
+function buildCategoryIndex(tables) {
+  const byMaterial = new Map();
+  tables.forEach(({ rows }) => {
+    const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码", "销售产品线", "采购分组", "采购组", "金蝶名称"]);
+    const columnMap = headerIndex >= 0
+      ? buildColumnMapByAliases(rows[headerIndex], {
+        materialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
+        productLine: TABLE_FIELD_ALIASES.productLine,
+        purchaseGroup: TABLE_FIELD_ALIASES.purchaseGroup,
+        materialName: ["金蝶名称", "物料名称", "物料名", "商品名称", "品名", "产品名称"],
+      })
+      : {};
+    const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+    rows.slice(startIndex).forEach((row) => {
+      const materialCode = getCellValue(row, 0) || getCellValue(row, columnMap.materialCode);
+      const materialKey = normalizeLookupKey(materialCode);
+      if (!materialKey) return;
+      byMaterial.set(materialKey, {
+        productLine: getCellValue(row, columnMap.productLine ?? 6),
+        purchaseGroup: getCellValue(row, 21) || getCellValue(row, columnMap.purchaseGroup),
+        materialName: getCellValue(row, columnMap.materialName ?? 3),
+      });
+    });
+  });
+  return { byMaterial };
+}
+
+function buildPurchaseDivisionIndex(tables) {
+  const byMaterial = new Map();
+  const byGroupMaterial = new Map();
+  const materialCodes = new Set();
+  tables.forEach(({ rows }) => {
+    const headerIndex = findHeaderRowIndex(rows, [
+      ...TABLE_FIELD_ALIASES.divisionPurchaseGroup,
+      ...TABLE_FIELD_ALIASES.divisionMaterialCode,
+      ...TABLE_FIELD_ALIASES.divisionBuyer,
+      ...TABLE_FIELD_ALIASES.divisionSupplier,
+    ]);
+    if (headerIndex < 0) return;
+    const columnMap = buildColumnMapByAliases(rows[headerIndex], {
+      purchaseGroup: TABLE_FIELD_ALIASES.divisionPurchaseGroup,
+      materialCode: TABLE_FIELD_ALIASES.divisionMaterialCode,
+      buyer: TABLE_FIELD_ALIASES.divisionBuyer,
+      supplierShortName: TABLE_FIELD_ALIASES.divisionSupplier,
+    });
+    if (columnMap.materialCode === undefined) return;
+
+    rows.slice(headerIndex + 1).forEach((row) => {
+      const materialCode = getCellValue(row, columnMap.materialCode);
+      const materialKey = normalizeLookupKey(materialCode);
+      if (!materialKey) return;
+      const item = {
+        purchaseGroup: getCellValue(row, columnMap.purchaseGroup),
+        materialCode,
+        buyer: getCellValue(row, columnMap.buyer),
+        supplierShortName: getCellValue(row, columnMap.supplierShortName),
+      };
+      materialCodes.add(materialKey);
+      pushMapArray(byMaterial, materialKey, item);
+      pushMapArray(byGroupMaterial, makeGroupMaterialKey(item.purchaseGroup, materialCode), item);
+    });
+  });
+  return { byMaterial, byGroupMaterial, materialCodes };
+}
+
+function buildRosterIndex(tables) {
+  const byName = new Map();
+  tables.forEach(({ rows }) => {
+    rows.forEach((row) => {
+      const name = getCellValue(row, 0);
+      const businessUnit = getCellValue(row, 1);
+      const nameKey = normalizeLookupKey(name);
+      if (!nameKey || !businessUnit || normalizeDemandHeader(name) === "姓名") return;
+      byName.set(nameKey, businessUnit);
+    });
+  });
+  return { byName };
+}
+
+function findHeaderRowIndex(rows, aliases) {
   let bestIndex = -1;
   let bestScore = 0;
+  const normalizedAliases = aliases.map(normalizeDemandHeader).filter(Boolean);
   rows.slice(0, 30).forEach((row, index) => {
-    const score = Object.keys(buildDemandColumnMap(row)).length;
+    const normalizedHeaders = row.map(normalizeDemandHeader);
+    const score = normalizedHeaders.filter((header) =>
+      header && normalizedAliases.some((alias) => header === alias || header.includes(alias) || alias.includes(header))
+    ).length;
     if (score > bestScore) {
       bestIndex = index;
       bestScore = score;
@@ -368,10 +514,10 @@ function findDemandHeaderRowIndex(rows) {
   return bestScore >= 2 ? bestIndex : -1;
 }
 
-function buildDemandColumnMap(headerRow = []) {
+function buildColumnMapByAliases(headerRow = [], aliasMap = {}) {
   const normalizedHeaders = headerRow.map(normalizeDemandHeader);
   const columnMap = {};
-  Object.entries(FIELD_ALIASES).forEach(([key, aliases]) => {
+  Object.entries(aliasMap).forEach(([key, aliases]) => {
     const normalizedAliases = aliases.map(normalizeDemandHeader).filter(Boolean);
     const exactIndex = normalizedHeaders.findIndex((header) => normalizedAliases.includes(header));
     if (exactIndex >= 0) {
@@ -395,9 +541,27 @@ function normalizeDemandHeader(value) {
     .toLowerCase();
 }
 
-function getDemandCellValue(row, columnIndex) {
+function getCellValue(row, columnIndex) {
   if (columnIndex === undefined || columnIndex < 0) return "";
   return String(row?.[columnIndex] ?? "").trim();
+}
+
+function normalizeLookupKey(value) {
+  return String(value ?? "").trim().replace(/\s+/g, "").toLowerCase();
+}
+
+function makeGroupMaterialKey(purchaseGroup, materialCode) {
+  return `${normalizeLookupKey(purchaseGroup)}|${normalizeLookupKey(materialCode)}`;
+}
+
+function pushMapArray(map, key, value) {
+  if (!key) return;
+  if (!map.has(key)) map.set(key, []);
+  map.get(key).push(value);
+}
+
+function joinUnique(values) {
+  return uniqueSortedValues(values).join("、");
 }
 
 function parseDemandQuantity(value) {
@@ -415,7 +579,7 @@ function rebuildFilterOptions() {
   state.filterOptions = Object.fromEntries(
     FILTER_DEFINITIONS.map((filter) => [
       filter.key,
-      uniqueSortedValues(state.demandRows.map((row) => row[filter.key]).filter(Boolean)),
+      uniqueSortedValues(state.demandRows.flatMap((row) => getRowFilterValues(row, filter.key))),
     ])
   );
 }
@@ -495,7 +659,8 @@ function getFilteredDemandRows() {
   return state.demandRows.filter((row) =>
     FILTER_DEFINITIONS.every((filter) => {
       const selected = state.filters.get(filter.key);
-      return !selected?.size || selected.has(row[filter.key]);
+      if (!selected?.size) return true;
+      return getRowFilterValues(row, filter.key).some((value) => selected.has(value));
     })
   );
 }
@@ -505,7 +670,7 @@ function updateDemandMetrics() {
   const total = quantityValues.length
     ? quantityValues.reduce((sum, value) => sum + value, 0)
     : state.filteredRows.length;
-  const supplierCount = new Set(state.filteredRows.map((row) => row.supplierShortName).filter(Boolean)).size;
+  const supplierCount = new Set(state.filteredRows.flatMap((row) => splitMultiValue(row.supplierShortName))).size;
   if (els.beihuoTotal) els.beihuoTotal.textContent = formatMetricNumber(total);
   if (els.supplierCount) els.supplierCount.textContent = formatMetricNumber(supplierCount);
   if (els.downloadDetailButton) els.downloadDetailButton.disabled = !state.filteredRows.length || !window.XLSX;
@@ -553,6 +718,17 @@ function getFilterButtonLabel(filter, selected) {
   if (values.length === 1) return values[0];
   if (values.length === 2) return values.join("、");
   return `已选${values.length}项`;
+}
+
+function getRowFilterValues(row, key) {
+  return splitMultiValue(row[key]);
+}
+
+function splitMultiValue(value) {
+  return String(value ?? "")
+    .split(/[、,，;；/]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function handleFilterToolbarClick(event) {
@@ -675,7 +851,7 @@ function getExportColumnWidth(key) {
     supplierShortName: 20,
     oaProcessNo: 20,
     materialCode: 18,
-    sku: 16,
+    materialCodeValid: 18,
     materialName: 28,
     quantity: 12,
   }[key] || 14;
