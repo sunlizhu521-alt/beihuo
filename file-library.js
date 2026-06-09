@@ -24,6 +24,10 @@ const FILTER_DEFINITIONS = [
   { key: "buyer", label: "采购订单下单人" },
   { key: "supplierShortName", label: "供应商简称" },
 ];
+const LINKED_FILTER_GROUPS = [
+  ["productLine", "salesSeries"],
+  ["purchaseGroup", "buyer"],
+];
 const DETAIL_COLUMNS = [
   { key: "purchaseGroup", label: "采购组" },
   { key: "buyer", label: "采购单订单下单人" },
@@ -613,9 +617,26 @@ function rebuildFilterOptions() {
   state.filterOptions = Object.fromEntries(
     FILTER_DEFINITIONS.map((filter) => [
       filter.key,
-      uniqueSortedValues(state.demandRows.flatMap((row) => getRowFilterValues(row, filter.key))),
+      uniqueSortedValues(getRowsForFilterOptions(filter.key).flatMap((row) => getRowFilterValues(row, filter.key))),
     ])
   );
+}
+
+function getRowsForFilterOptions(targetKey) {
+  const linkedKeys = getLinkedFilterKeys(targetKey);
+  if (!linkedKeys.length) return state.demandRows;
+  return state.demandRows.filter((row) =>
+    linkedKeys.every((key) => {
+      const selected = state.filters.get(key);
+      if (!selected?.size) return true;
+      return getRowFilterValues(row, key).some((value) => selected.has(value));
+    })
+  );
+}
+
+function getLinkedFilterKeys(targetKey) {
+  const group = LINKED_FILTER_GROUPS.find((keys) => keys.includes(targetKey));
+  return group ? group.filter((key) => key !== targetKey) : [];
 }
 
 function uniqueSortedValues(values) {
@@ -787,12 +808,15 @@ function handleFilterToolbarChange(event) {
     selected.delete(input.value);
   }
   state.filters.set(input.dataset.filterKey, selected);
+  rebuildFilterOptions();
+  pruneFilterSelections();
   renderDemandDashboard();
 }
 
 function clearAllFilters() {
   FILTER_DEFINITIONS.forEach((filter) => state.filters.set(filter.key, new Set()));
   closeFilterMenus();
+  rebuildFilterOptions();
   renderDemandDashboard();
 }
 
