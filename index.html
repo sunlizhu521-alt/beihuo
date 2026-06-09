@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>备货需求分配 - 备货需求分配</title>
-    <link rel="stylesheet" href="./styles.css?v=20260609-5" />
+    <link rel="stylesheet" href="./styles.css?v=20260609-6" />
   </head>
   <body>
     <div class="app-shell">
@@ -63,13 +63,19 @@
         </section>
 
         <section class="panel filter-panel" aria-label="备货筛选器">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Filters</p>
+              <h2>筛选条件</h2>
+            </div>
+            <button id="clearFiltersButton" type="button">重置筛选</button>
+          </div>
           <div class="filter-toolbar" id="filterToolbar">
             <div class="multi-filter" data-filter="businessUnit"></div>
             <div class="multi-filter" data-filter="productLine"></div>
             <div class="multi-filter" data-filter="purchaseGroup"></div>
             <div class="multi-filter" data-filter="buyer"></div>
             <div class="multi-filter" data-filter="supplierShortName"></div>
-            <button id="clearFiltersButton" class="secondary-button clear-filters-button" type="button">清空筛选</button>
           </div>
         </section>
 
@@ -121,6 +127,6 @@
     <script src="./vendor/xlsx.full.min.js?v=20260601-1"></script>
     <script src="./vendor/jszip.min.js?v=20260609-1"></script>
     <script src="./shared-library.js?v=20260609-3"></script>
-    <script src="./file-library.js?v=20260609-11"></script>
+    <script src="./file-library.js?v=20260609-13"></script>
   </body>
 </html>

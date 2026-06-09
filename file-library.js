@@ -71,6 +71,7 @@ const state = {
 
 async function init() {
   bindEvents();
+  renderFilterControls();
   if (window.ensureSharedLibraryLoaded) {
     await window.ensureSharedLibraryLoaded();
   }
@@ -518,7 +519,8 @@ function renderFilterControls() {
     const selected = state.filters.get(filter.key) || new Set();
     container.innerHTML = `
       <button class="multi-filter-button" type="button" data-filter-button="${filter.key}" ${options.length ? "" : "disabled"}>
-        ${escapeHtml(getFilterButtonLabel(filter, selected))}
+        <span>${escapeHtml(getFilterButtonLabel(filter, selected))}</span>
+        <i aria-hidden="true">▾</i>
       </button>
       <div class="multi-filter-menu">
         <label class="multi-filter-option">
@@ -538,7 +540,7 @@ function renderFilterControls() {
 function renderFilterOption(filterKey, value, checked) {
   const safeValue = escapeHtml(value);
   return `
-    <label class="multi-filter-option">
+    <label class="multi-filter-option ${checked ? "selected" : ""}">
       <input type="checkbox" data-filter-option data-filter-key="${filterKey}" value="${safeValue}" ${checked ? "checked" : ""} />
       <span>${safeValue}</span>
     </label>
