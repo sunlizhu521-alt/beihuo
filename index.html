@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>备货需求分配 - 备货需求分配</title>
-    <link rel="stylesheet" href="./styles.css?v=20260609-6" />
+    <link rel="stylesheet" href="./styles.css?v=20260609-7" />
   </head>
   <body>
     <div class="app-shell">
@@ -62,23 +62,6 @@
           </article>
         </section>
 
-        <section class="panel filter-panel" aria-label="备货筛选器">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Filters</p>
-              <h2>筛选条件</h2>
-            </div>
-            <button id="clearFiltersButton" type="button">重置筛选</button>
-          </div>
-          <div class="filter-toolbar" id="filterToolbar">
-            <div class="multi-filter" data-filter="businessUnit"></div>
-            <div class="multi-filter" data-filter="productLine"></div>
-            <div class="multi-filter" data-filter="purchaseGroup"></div>
-            <div class="multi-filter" data-filter="buyer"></div>
-            <div class="multi-filter" data-filter="supplierShortName"></div>
-          </div>
-        </section>
-
         <section class="panel library-panel">
           <div class="panel-heading">
             <div>
@@ -100,6 +83,16 @@
               <button id="downloadDetailButton" class="secondary-button" type="button" disabled>下载表格</button>
               <span class="upload-state" id="detailState">暂无数据</span>
             </div>
+          </div>
+          <div class="detail-filter-row" aria-label="明细筛选器">
+            <div class="filter-toolbar" id="filterToolbar">
+              <div class="multi-filter" data-filter="businessUnit"></div>
+              <div class="multi-filter" data-filter="productLine"></div>
+              <div class="multi-filter" data-filter="purchaseGroup"></div>
+              <div class="multi-filter" data-filter="buyer"></div>
+              <div class="multi-filter" data-filter="supplierShortName"></div>
+            </div>
+            <button id="clearFiltersButton" type="button">重置筛选</button>
           </div>
           <div class="table-wrap">
             <table class="detail-table">

@@ -639,6 +639,17 @@ h2 {
   overflow: visible;
 }
 
+.detail-filter-row {
+  position: relative;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 14px;
+  overflow: visible;
+}
+
 .detail-actions {
   display: flex;
   flex-wrap: wrap;
@@ -743,6 +754,10 @@ h2 {
   }
 
   .filter-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-filter-row {
     grid-template-columns: 1fr;
   }
 
