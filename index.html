@@ -3,21 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>优乐步对账 - 优乐步对账</title>
+    <title>备货需求分配 - 备货需求分配</title>
     <link rel="stylesheet" href="./styles.css?v=20260609-3" />
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="优乐步对账">
+      <aside class="sidebar" aria-label="备货需求分配">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">YB</span>
+          <span class="brand-mark" aria-hidden="true">BH</span>
           <div>
-            <strong>优乐步对账</strong>
-            <span>对账工作台</span>
+            <strong>备货需求分配</strong>
+            <span>需求分配工作台</span>
           </div>
         </div>
         <nav class="nav-list">
-          <a class="active" href="./index.html">优乐步对账</a>
+          <a class="active" href="./index.html">备货需求分配</a>
         </nav>
       </aside>
 
@@ -25,7 +25,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">File Library</p>
-            <h1>优乐步对账</h1>
+            <h1>备货需求分配</h1>
             <small class="source-note" id="librarySourceNote">本地文件库｜引用时间：--</small>
           </div>
           <div class="topbar-actions">
@@ -39,7 +39,7 @@
           <article class="metric">
             <span>文件槽位</span>
             <strong id="slotCount">4</strong>
-            <small>对账文件</small>
+            <small>分配文件</small>
           </article>
           <article class="metric">
             <span>已上传</span>
@@ -57,7 +57,7 @@
             <small>按上传时间</small>
           </article>
           <article class="metric result-metric">
-            <span>优乐步对账表总行数</span>
+            <span>备货需求分配表总行数</span>
             <strong id="yileTotalRows">0</strong>
             <small>不含表头</small>
           </article>
@@ -87,12 +87,12 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Rules</p>
-              <h2>对账逻辑说明</h2>
+              <h2>备货需求分配逻辑说明</h2>
             </div>
           </div>
           <div class="logic-grid">
-            <div><strong>文件来源</strong><span>槽位1上传运营登记表，槽位2上传优乐步对账表；点击一键刷新应用后，页面会基于已引用文件刷新统计。</span></div>
-            <div><strong>优乐步对账表列位</strong><span>M列作为姓名，N列作为快递单号；生成表只从第3行开始在Q列写核对结果、R列写命中备注。</span></div>
+            <div><strong>文件来源</strong><span>槽位1上传运营登记表，槽位2上传备货需求分配表；点击一键刷新应用后，页面会基于已引用文件刷新统计。</span></div>
+            <div><strong>备货需求分配表列位</strong><span>M列作为姓名，N列作为快递单号；生成表只从第3行开始在Q列写核对结果、R列写命中备注。</span></div>
             <div><strong>保留A-N格式</strong><span>生成时会保护A-N列原有样式、边框、列宽、筛选、行设置和合并单元格；只从第3行开始写新增内容。</span></div>
             <div><strong>姓名优先核对</strong><span>先用M列姓名去运营登记表全工作簿全部内容查找，命中后作为姓名条件命中。</span></div>
             <div><strong>快递单号核对</strong><span>再用N列快递单号去运营登记表全工作簿全部内容查找；N列有合并时，Q/R列按同样行范围合并。</span></div>
@@ -116,7 +116,7 @@
 
     <script src="./vendor/xlsx.full.min.js?v=20260601-1"></script>
     <script src="./vendor/jszip.min.js?v=20260609-1"></script>
-    <script src="./shared-library.js?v=20260609-1"></script>
-    <script src="./file-library.js?v=20260609-8"></script>
+    <script src="./shared-library.js?v=20260609-2"></script>
+    <script src="./file-library.js?v=20260609-9"></script>
   </body>
 </html>

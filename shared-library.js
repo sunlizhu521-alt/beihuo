@@ -1,5 +1,5 @@
 (function () {
-  const DB_NAME = "youlebu-reconciliation-library";
+  const DB_NAME = "beihuo-demand-allocation-library";
   const DB_VERSION = 1;
   const STORE_NAME = "file-slots";
   const SHARED_LIBRARY_URL = "./data/shared-library.json";

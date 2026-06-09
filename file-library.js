@@ -1,12 +1,12 @@
-const DB_NAME = "youlebu-reconciliation-library";
+const DB_NAME = "beihuo-demand-allocation-library";
 const DB_VERSION = 1;
 const STORE_NAME = "file-slots";
 
 const slots = [
   { id: "file-1", label: "运营登记表" },
-  { id: "file-2", label: "优乐步对账表" },
-  { id: "file-3", label: "对账文件3" },
-  { id: "file-4", label: "优乐步对账 4" },
+  { id: "file-2", label: "备货需求分配表" },
+  { id: "file-3", label: "备货需求分配文件3" },
+  { id: "file-4", label: "备货需求分配文件4" },
 ];
 
 const generateSlotIds = {
@@ -18,7 +18,7 @@ const generateSlotIds = {
 const OPERATION_SLOT_ID = generateSlotIds.operation;
 const DEFAULT_SLOT_ACCEPT = ".xlsx,.xls,.csv,.txt,.pdf";
 const OPERATION_SLOT_ACCEPT = ".xlsx,.xlsm";
-const OPERATION_FORMAT_MESSAGE = "优乐步对账表需要上传 .xlsx 或 .xlsm 格式，才能保留原表格式；如果是 .xls，请先在 Excel 中另存为 .xlsx 后再上传。";
+const OPERATION_FORMAT_MESSAGE = "备货需求分配表需要上传 .xlsx 或 .xlsm 格式，才能保留原表格式；如果是 .xls，请先在 Excel 中另存为 .xlsx 后再上传。";
 const NAME_COLUMN_INDEX = 12;
 const TRACKING_COLUMN_INDEX = 13;
 const CHECK_COLUMN_INDEX = 16;
@@ -325,7 +325,7 @@ async function deleteSlot(slotId) {
 }
 
 async function clearLibraryCache() {
-  const confirmed = window.confirm("确认清除当前浏览器里的优乐步对账文件缓存吗？清除后需要重新上传并应用文件。");
+  const confirmed = window.confirm("确认清除当前浏览器里的备货需求分配文件缓存吗？清除后需要重新上传并应用文件。");
   if (!confirmed) return;
 
   els.clearCacheButton.disabled = true;
@@ -339,7 +339,7 @@ async function clearLibraryCache() {
   } catch (error) {
     console.warn("clear library cache failed", error);
     els.libraryState.textContent = "清除失败";
-    window.alert(error.message || "清除缓存失败，请关闭其他对账页面后重试。");
+    window.alert(error.message || "清除缓存失败，请关闭其他备货需求分配页面后重试。");
   } finally {
     els.clearCacheButton.disabled = false;
   }
@@ -410,7 +410,7 @@ async function buildReconciliationWorkbookResult() {
     sources.operation.selectedSheetName
   );
   const reconciliationSheet = reconciliationWorkbook.Sheets[reconciliationSheetName];
-  if (!reconciliationSheet) throw new Error("优乐步对账表没有可读取的工作表。");
+  if (!reconciliationSheet) throw new Error("备货需求分配表没有可读取的工作表。");
 
   const result = fillReconciliationSheet(reconciliationSheet, registrationEntries);
   return { sources, reconciliationWorkbook, reconciliationSheetName, result };
@@ -431,8 +431,8 @@ function getAppliedFileRecord(slotId) {
 function getGenerateSourceLabel(key) {
   return {
     wdt: "运营登记表",
-    operation: "优乐步对账表",
-    yile: "对账文件3",
+    operation: "备货需求分配表",
+    yile: "备货需求分配文件3",
   }[key] || key;
 }
 
@@ -447,7 +447,7 @@ async function buildPreservedReconciliationBlob(sourceFile, sheetName, result) {
   const zip = await window.JSZip.loadAsync(await sourceFile.arrayBuffer());
   const sheetPath = await getWorkbookSheetPath(zip, sheetName);
   const sheetFile = zip.file(sheetPath);
-  if (!sheetFile) throw new Error("没有找到优乐步对账表对应的工作表文件。");
+  if (!sheetFile) throw new Error("没有找到备货需求分配表对应的工作表文件。");
 
   const sheetXml = await sheetFile.async("string");
   const patchedSheetXml = patchWorksheetXml(sheetXml, result);
@@ -465,7 +465,7 @@ function isOpenXmlWorkbook(fileName) {
 async function getWorkbookSheetPath(zip, sheetName) {
   const workbookXml = await zip.file("xl/workbook.xml")?.async("string");
   const relsXml = await zip.file("xl/_rels/workbook.xml.rels")?.async("string");
-  if (!workbookXml || !relsXml) throw new Error("优乐步对账表文件结构不完整，无法保真导出。");
+  if (!workbookXml || !relsXml) throw new Error("备货需求分配表文件结构不完整，无法保真导出。");
 
   const sheetTag = (workbookXml.match(/<sheet\b[^>]*\/?>/g) || []).find((tag) => {
     const attrs = parseXmlAttributes(tag);
@@ -1029,7 +1029,7 @@ function normalizeSearchValue(value) {
 }
 
 function buildGeneratedFileName(sourceName) {
-  const baseName = sanitizeFileNamePart(String(sourceName || "优乐步对账表").replace(/\.[^.]+$/, "")) || "优乐步对账表";
+  const baseName = sanitizeFileNamePart(String(sourceName || "备货需求分配表").replace(/\.[^.]+$/, "")) || "备货需求分配表";
   const stamp = formatFileTimestamp(new Date());
   return `${baseName}_已核对_${stamp}.xlsx`;
 }
@@ -1195,7 +1195,7 @@ function getSlotAccept(slotId) {
 
 function renderSlotFormatHint(slot) {
   if (slot.id !== OPERATION_SLOT_ID) return "";
-  return `<small class="slot-format-hint">优乐步对账表仅支持 .xlsx/.xlsm；.xls 请先另存为 .xlsx。</small>`;
+  return `<small class="slot-format-hint">备货需求分配表仅支持 .xlsx/.xlsm；.xls 请先另存为 .xlsx。</small>`;
 }
 
 function renderSheetPicker(slot, record, display) {
@@ -1211,7 +1211,7 @@ function renderSheetPicker(slot, record, display) {
   const disabled = !display || !options.length;
   const sheetHint = options.length
     ? `${hasPending ? "应用刷新后使用" : "当前用于生成"}：${escapeHtml(selectedSheetName || options[0])}`
-    : "上传优乐步对账表后读取";
+    : "上传备货需求分配表后读取";
 
   return `
     <label class="sheet-picker">
@@ -1389,7 +1389,7 @@ function deleteLibraryDatabase() {
     const request = indexedDB.deleteDatabase(DB_NAME);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("文件库正被其他页面占用，请关闭其他对账页面后重试。"));
+    request.onblocked = () => reject(new Error("文件库正被其他备货需求分配页面占用，请关闭其他备货需求分配页面后重试。"));
   });
 }
 
