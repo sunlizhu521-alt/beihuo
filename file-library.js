@@ -3,10 +3,10 @@ const DB_VERSION = 1;
 const STORE_NAME = "file-slots";
 
 const slots = [
-  { id: "file-1", label: "备货需求分配文件1" },
-  { id: "file-2", label: "备货需求分配文件2" },
-  { id: "file-3", label: "备货需求分配文件3" },
-  { id: "file-4", label: "备货需求分配文件4" },
+  { id: "file-1", label: "Dim-YL医疗器械商品分类" },
+  { id: "file-2", label: "Dim-采购部分工明细" },
+  { id: "file-3", label: "Dim-花名册（姓名&一级部门）" },
+  { id: "file-4", label: "备货需求表" },
 ];
 
 const TABLE_FILE_ACCEPT = ".xlsx,.xls,.xlsm,.csv";
@@ -55,6 +55,7 @@ const els = {
   supplierCount: document.querySelector("#supplierCount"),
   filterToolbar: document.querySelector("#filterToolbar"),
   clearFiltersButton: document.querySelector("#clearFiltersButton"),
+  downloadDetailButton: document.querySelector("#downloadDetailButton"),
   detailState: document.querySelector("#detailState"),
   detailTableBody: document.querySelector("#detailTableBody"),
   detailEmpty: document.querySelector("#detailEmpty"),
@@ -123,6 +124,7 @@ function bindEvents() {
   els.filterToolbar?.addEventListener("click", handleFilterToolbarClick);
   els.filterToolbar?.addEventListener("change", handleFilterToolbarChange);
   els.clearFiltersButton?.addEventListener("click", clearAllFilters);
+  els.downloadDetailButton?.addEventListener("click", downloadDetailWorkbook);
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".multi-filter")) closeFilterMenus();
   });
@@ -505,6 +507,7 @@ function updateDemandMetrics() {
   const supplierCount = new Set(state.filteredRows.map((row) => row.supplierShortName).filter(Boolean)).size;
   if (els.beihuoTotal) els.beihuoTotal.textContent = formatMetricNumber(total);
   if (els.supplierCount) els.supplierCount.textContent = formatMetricNumber(supplierCount);
+  if (els.downloadDetailButton) els.downloadDetailButton.disabled = !state.filteredRows.length || !window.XLSX;
 }
 
 function renderFilterControls() {
@@ -604,6 +607,76 @@ function renderDemandTableRow(row) {
       ${DETAIL_COLUMNS.map((column) => `<td>${escapeHtml(row[column.key] || "")}</td>`).join("")}
     </tr>
   `;
+}
+
+function downloadDetailWorkbook() {
+  if (!state.filteredRows.length) {
+    window.alert("暂无可下载的明细数据。");
+    return;
+  }
+  if (!window.XLSX) {
+    window.alert("Excel 导出组件未加载，请刷新页面后重试。");
+    return;
+  }
+
+  const workbook = window.XLSX.utils.book_new();
+  const usedSheetNames = new Set();
+  groupRowsByBuyer(state.filteredRows).forEach(([buyer, rows]) => {
+    const sheetName = makeUniqueSheetName(buyer, usedSheetNames);
+    const sheetRows = [
+      DETAIL_COLUMNS.map((column) => column.label),
+      ...rows.map((row) => DETAIL_COLUMNS.map((column) => row[column.key] || "")),
+    ];
+    const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
+    worksheet["!cols"] = DETAIL_COLUMNS.map((column) => ({ wch: getExportColumnWidth(column.key) }));
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  });
+
+  window.XLSX.writeFile(workbook, `备货需求分配明细_${formatFileTimestamp(new Date())}.xlsx`);
+}
+
+function groupRowsByBuyer(rows) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const buyer = String(row.buyer || "").trim() || "未填写下单人";
+    if (!groups.has(buyer)) groups.set(buyer, []);
+    groups.get(buyer).push(row);
+  });
+  return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right, "zh-CN", { numeric: true }));
+}
+
+function makeUniqueSheetName(rawName, usedSheetNames) {
+  const baseName = sanitizeSheetName(rawName) || "未填写下单人";
+  let sheetName = baseName.slice(0, 31);
+  let index = 2;
+  while (usedSheetNames.has(sheetName)) {
+    const suffix = `_${index}`;
+    sheetName = `${baseName.slice(0, 31 - suffix.length)}${suffix}`;
+    index += 1;
+  }
+  usedSheetNames.add(sheetName);
+  return sheetName;
+}
+
+function sanitizeSheetName(value) {
+  return String(value || "")
+    .replace(/[\[\]:*?/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getExportColumnWidth(key) {
+  return {
+    purchaseGroup: 14,
+    buyer: 18,
+    applicant: 14,
+    supplierShortName: 20,
+    oaProcessNo: 20,
+    materialCode: 18,
+    sku: 16,
+    materialName: 28,
+    quantity: 12,
+  }[key] || 14;
 }
 
 function getDisplayRecord(record) {
@@ -709,6 +782,16 @@ function formatFileSize(size = 0) {
     unitIndex += 1;
   }
   return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatFileTimestamp(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+    String(date.getHours()).padStart(2, "0"),
+    String(date.getMinutes()).padStart(2, "0"),
+  ].join("");
 }
 
 function formatMetricNumber(value) {

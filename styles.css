@@ -617,6 +617,14 @@ h2 {
   overflow: visible;
 }
 
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .table-wrap {
   position: relative;
   overflow-x: auto;
@@ -720,6 +728,17 @@ h2 {
 
   .multi-filter-menu {
     width: min(100%, 280px);
+  }
+
+  .detail-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .detail-actions button,
+  .detail-actions .upload-state {
+    width: 100%;
+    justify-content: center;
   }
 
   h1 {
