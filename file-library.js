@@ -36,9 +36,11 @@ const DETAIL_COLUMNS = [
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
   { key: "materialCode", label: "物料编码" },
+  { key: "sku", label: "SKU" },
   { key: "materialCodeValid", label: "采购分工明细是否存在" },
   { key: "materialName", label: "物料名称" },
   { key: "quantity", label: "数量" },
+  { key: "requiredReadyDate", label: "要求货好时间" },
 ];
 const TABLE_FIELD_ALIASES = {
   productLine: ["销售产品线", "产品线", "一级产品线", "销售线"],
@@ -48,6 +50,7 @@ const TABLE_FIELD_ALIASES = {
   demandMaterialCode: ["识别码", "物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
   demandProcessNo: ["流程号", "流程编号", "OA备货流程号", "OA流程号", "备货流程号", "备货需求流程号", "OA编号", "OA单号", "单号"],
   demandQuantity: ["数量"],
+  demandRequiredReadyDate: ["要求货好时间", "要求货好日期", "货好时间", "货好日期", "要求到货时间", "要求到货日期"],
   divisionPurchaseGroup: ["采购组", "采购分组", "采购组别", "采购分组名称"],
   divisionMaterialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
   divisionBuyer: ["采购单订单下单人", "采购订单下单人", "采购下单人", "采购单下单人", "订单下单人", "下单人", "采购员", "采购负责人", "采购对接人", "采购组对接人"],
@@ -335,6 +338,7 @@ async function buildDemandAllocationRows(records) {
       applicant: TABLE_FIELD_ALIASES.demandApplicant,
       materialCode: TABLE_FIELD_ALIASES.demandMaterialCode,
       oaProcessNo: TABLE_FIELD_ALIASES.demandProcessNo,
+      requiredReadyDate: TABLE_FIELD_ALIASES.demandRequiredReadyDate,
     });
     columnMap.quantity = findExactHeaderColumnIndex(rows[headerIndex], "数量");
     if (columnMap.materialCode === undefined) return [];
@@ -345,6 +349,7 @@ async function buildDemandAllocationRows(records) {
       const quantityNumber = getDemandRowQuantity(row, columnMap);
       const quantity = Number.isFinite(quantityNumber) ? formatPlainNumber(quantityNumber) : "";
       const oaProcessNo = getCellValue(row, columnMap.oaProcessNo);
+      const requiredReadyDate = getCellValue(row, columnMap.requiredReadyDate);
       if (!materialCode && !applicant && !quantity && !oaProcessNo) return null;
 
       const materialKey = normalizeLookupKey(materialCode);
@@ -367,9 +372,11 @@ async function buildDemandAllocationRows(records) {
         supplierShortName,
         oaProcessNo,
         materialCode,
+        sku: category.sku || "",
         materialCodeValid: divisionIndex.materialCodes.has(materialKey) ? "是" : "否",
         materialName: category.materialName || "",
         quantity,
+        requiredReadyDate,
         quantityNumber,
         sourceFile: source.fileName,
         sourceSheet: source.sheetName,
@@ -432,10 +439,11 @@ function sheetToRows(sheet) {
 function buildCategoryIndex(tables) {
   const byMaterial = new Map();
   tables.forEach(({ rows }) => {
-    const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码", "销售产品线", "销售系列", "采购分组", "采购组", "金蝶名称"]);
+    const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码", "SKU", "销售产品线", "销售系列", "采购分组", "采购组", "金蝶名称"]);
     const columnMap = headerIndex >= 0
       ? buildColumnMapByAliases(rows[headerIndex], {
         materialCode: ["物料编码", "识别码", "物料编号", "商品编码", "存货编码", "产品编码"],
+        sku: ["SKU", "sku", "Sku"],
         productLine: TABLE_FIELD_ALIASES.productLine,
         salesSeries: TABLE_FIELD_ALIASES.salesSeries,
         purchaseGroup: TABLE_FIELD_ALIASES.purchaseGroup,
@@ -448,6 +456,7 @@ function buildCategoryIndex(tables) {
       const materialKey = normalizeLookupKey(materialCode);
       if (!materialKey) return;
       byMaterial.set(materialKey, {
+        sku: getCellValue(row, 2) || getCellValue(row, columnMap.sku),
         productLine: getCellValue(row, columnMap.productLine ?? 6),
         salesSeries: getCellValue(row, columnMap.salesSeries ?? 7),
         purchaseGroup: getCellValue(row, 21) || getCellValue(row, columnMap.purchaseGroup),
@@ -912,9 +921,11 @@ function getExportColumnWidth(key) {
     supplierShortName: 20,
     oaProcessNo: 20,
     materialCode: 18,
+    sku: 16,
     materialCodeValid: 18,
     materialName: 28,
     quantity: 12,
+    requiredReadyDate: 18,
   }[key] || 14;
 }
 
