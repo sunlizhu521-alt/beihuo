@@ -902,7 +902,7 @@ function renderDemandTableRow(row) {
   `;
 }
 
-function downloadDetailWorkbook() {
+async function downloadDetailWorkbook() {
   if (!state.filteredRows.length) {
     window.alert("暂无可下载的明细数据。");
     return;
@@ -914,6 +914,7 @@ function downloadDetailWorkbook() {
 
   const workbook = window.XLSX.utils.book_new();
   const usedSheetNames = new Set();
+  const sheetShapes = [];
   groupRowsByBuyer(state.filteredRows).forEach(([buyer, rows]) => {
     const sheetName = makeUniqueSheetName(buyer, usedSheetNames);
     const sheetRows = [
@@ -923,9 +924,151 @@ function downloadDetailWorkbook() {
     const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
     worksheet["!cols"] = DETAIL_COLUMNS.map((column) => ({ wch: getExportColumnWidth(column.key) }));
     window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    sheetShapes.push({ rowCount: sheetRows.length, columnCount: DETAIL_COLUMNS.length });
   });
 
-  window.XLSX.writeFile(workbook, `备货需求分配明细_${formatFileTimestamp(new Date())}.xlsx`);
+  const fileName = `备货需求分配明细_${formatFileTimestamp(new Date())}.xlsx`;
+  if (!window.JSZip) {
+    window.XLSX.writeFile(workbook, fileName);
+    return;
+  }
+
+  try {
+    await writeStyledDetailWorkbook(workbook, sheetShapes, fileName);
+  } catch (error) {
+    console.warn("styled workbook export failed", error);
+    window.XLSX.writeFile(workbook, fileName);
+  }
+}
+
+async function writeStyledDetailWorkbook(workbook, sheetShapes, fileName) {
+  const workbookArray = window.XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "array",
+  });
+  const zip = await window.JSZip.loadAsync(workbookArray);
+  zip.file("xl/styles.xml", buildDetailWorkbookStylesXml());
+
+  await Promise.all(sheetShapes.map(async (shape, index) => {
+    const path = `xl/worksheets/sheet${index + 1}.xml`;
+    const file = zip.file(path);
+    if (!file) return;
+    const xml = await file.async("string");
+    zip.file(path, styleDetailWorksheetXml(xml, shape));
+  }));
+
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  downloadBlob(blob, fileName);
+}
+
+function buildDetailWorkbookStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFB7C9D6"/></left>
+      <right style="thin"><color rgb="FFB7C9D6"/></right>
+      <top style="thin"><color rgb="FFB7C9D6"/></top>
+      <bottom style="thin"><color rgb="FFB7C9D6"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="4">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="0"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+  <dxfs count="0"/>
+  <tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleMedium9"/>
+</styleSheet>`;
+}
+
+function styleDetailWorksheetXml(xml, shape) {
+  const parser = new DOMParser();
+  const documentXml = parser.parseFromString(xml, "application/xml");
+  const parseError = documentXml.querySelector("parsererror");
+  if (parseError) return xml;
+
+  const sheetData = documentXml.querySelector("sheetData");
+  if (!sheetData) return xml;
+
+  const wrapColumnIndex = DETAIL_COLUMNS.findIndex((column) => column.key === "stockReason") + 1;
+  for (let rowIndex = 1; rowIndex <= shape.rowCount; rowIndex += 1) {
+    const row = ensureWorksheetRow(documentXml, sheetData, rowIndex);
+    for (let columnIndex = 1; columnIndex <= shape.columnCount; columnIndex += 1) {
+      const cell = ensureWorksheetCell(documentXml, row, rowIndex, columnIndex);
+      const styleId = rowIndex === 1 ? "1" : columnIndex === wrapColumnIndex ? "3" : "2";
+      cell.setAttribute("s", styleId);
+    }
+  }
+
+  return new XMLSerializer().serializeToString(documentXml);
+}
+
+function ensureWorksheetRow(documentXml, sheetData, rowIndex) {
+  let row = sheetData.querySelector(`row[r="${rowIndex}"]`);
+  if (row) return row;
+
+  row = documentXml.createElementNS(sheetData.namespaceURI, "row");
+  row.setAttribute("r", String(rowIndex));
+  const nextRow = [...sheetData.children].find((item) => Number(item.getAttribute("r")) > rowIndex);
+  sheetData.insertBefore(row, nextRow || null);
+  return row;
+}
+
+function ensureWorksheetCell(documentXml, row, rowIndex, columnIndex) {
+  const cellRef = `${columnIndexToName(columnIndex)}${rowIndex}`;
+  let cell = row.querySelector(`c[r="${cellRef}"]`);
+  if (cell) return cell;
+
+  cell = documentXml.createElementNS(row.namespaceURI, "c");
+  cell.setAttribute("r", cellRef);
+  const nextCell = [...row.children].find((item) => cellNameToColumnIndex(item.getAttribute("r")) > columnIndex);
+  row.insertBefore(cell, nextCell || null);
+  return cell;
+}
+
+function columnIndexToName(index) {
+  let name = "";
+  let current = index;
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    current = Math.floor((current - 1) / 26);
+  }
+  return name;
+}
+
+function cellNameToColumnIndex(cellName) {
+  const letters = String(cellName || "").match(/[A-Z]+/i)?.[0] || "";
+  return letters.toUpperCase().split("").reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0);
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function groupRowsByBuyer(rows) {
