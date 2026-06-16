@@ -35,6 +35,8 @@ const DETAIL_COLUMNS = [
   { key: "applicant", label: "申请人" },
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
+  { key: "stockReason", label: "备货原因" },
+  { key: "purchaseEntity", label: "采购主体" },
   { key: "materialCode", label: "物料编码" },
   { key: "sku", label: "SKU" },
   { key: "materialCodeValid", label: "采购分工明细是否存在" },
@@ -51,6 +53,8 @@ const TABLE_FIELD_ALIASES = {
   demandApplicant: ["创建人", "申请人", "OA申请人", "流程申请人"],
   demandMaterialCode: ["识别码", "物料编码", "物料编号", "商品编码", "存货编码", "产品编码"],
   demandProcessNo: ["流程号", "流程编号", "OA备货流程号", "OA流程号", "备货流程号", "备货需求流程号", "OA编号", "OA单号", "单号"],
+  demandStockReason: ["备货原因", "申请原因", "需求原因", "原因"],
+  demandPurchaseEntity: ["采购主体", "采购公司", "采购组织", "采购方", "主体"],
   demandQuantity: ["数量"],
   demandRequiredReadyDate: ["要求货好时间", "要求货好日期", "货好时间", "货好日期", "要求到货时间", "要求到货日期"],
   divisionPurchaseGroup: ["采购组", "采购分组", "采购组别", "采购分组名称"],
@@ -341,6 +345,8 @@ async function buildDemandAllocationRows(records) {
       applicant: TABLE_FIELD_ALIASES.demandApplicant,
       materialCode: TABLE_FIELD_ALIASES.demandMaterialCode,
       oaProcessNo: TABLE_FIELD_ALIASES.demandProcessNo,
+      stockReason: TABLE_FIELD_ALIASES.demandStockReason,
+      purchaseEntity: TABLE_FIELD_ALIASES.demandPurchaseEntity,
       requiredReadyDate: TABLE_FIELD_ALIASES.demandRequiredReadyDate,
     });
     columnMap.quantity = findExactHeaderColumnIndex(rows[headerIndex], "数量");
@@ -352,6 +358,8 @@ async function buildDemandAllocationRows(records) {
       const quantityNumber = getDemandRowQuantity(row, columnMap);
       const quantity = Number.isFinite(quantityNumber) ? formatPlainNumber(quantityNumber) : "";
       const oaProcessNo = getCellValue(row, columnMap.oaProcessNo);
+      const stockReason = getCellValue(row, columnMap.stockReason);
+      const purchaseEntity = getCellValue(row, columnMap.purchaseEntity);
       const requiredReadyDate = getCellValue(row, columnMap.requiredReadyDate);
       if (!materialCode && !applicant && !quantity && !oaProcessNo) return null;
 
@@ -377,6 +385,8 @@ async function buildDemandAllocationRows(records) {
         applicant,
         supplierShortName,
         oaProcessNo,
+        stockReason,
+        purchaseEntity,
         materialCode,
         sku: category.sku || "",
         materialCodeValid: divisionIndex.materialCodes.has(materialKey) ? "是" : "否",
@@ -956,6 +966,8 @@ function getExportColumnWidth(key) {
     applicant: 14,
     supplierShortName: 20,
     oaProcessNo: 20,
+    stockReason: 22,
+    purchaseEntity: 18,
     materialCode: 18,
     sku: 16,
     materialCodeValid: 18,
