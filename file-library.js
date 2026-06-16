@@ -922,7 +922,7 @@ async function downloadDetailWorkbook() {
       ...rows.map((row) => DETAIL_COLUMNS.map((column) => row[column.key] || "")),
     ];
     const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
-    worksheet["!cols"] = DETAIL_COLUMNS.map((column) => ({ wch: getExportColumnWidth(column.key) }));
+    worksheet["!cols"] = getAutoExportColumns(sheetRows);
     window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     sheetShapes.push({ rowCount: sheetRows.length, columnCount: DETAIL_COLUMNS.length });
   });
@@ -1120,6 +1120,33 @@ function getExportColumnWidth(key) {
     minimumOrderQuantity: 12,
     minimumOrderStatus: 14,
   }[key] || 14;
+}
+
+function getExportColumnMaxWidth(key) {
+  return {
+    stockReason: 120,
+  }[key] || 255;
+}
+
+function getAutoExportColumns(sheetRows) {
+  return DETAIL_COLUMNS.map((column, columnIndex) => {
+    const contentWidth = sheetRows.reduce((width, row) => {
+      const cellWidth = getTextDisplayWidth(row?.[columnIndex]);
+      return Math.max(width, cellWidth);
+    }, 0);
+    const minWidth = getExportColumnWidth(column.key);
+    const maxWidth = getExportColumnMaxWidth(column.key);
+    return { wch: Math.min(Math.max(contentWidth + 2, minWidth), maxWidth) };
+  });
+}
+
+function getTextDisplayWidth(value) {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .reduce((maxWidth, line) => {
+      const lineWidth = [...line].reduce((width, char) => width + (char.charCodeAt(0) > 255 ? 2 : 1), 0);
+      return Math.max(maxWidth, lineWidth);
+    }, 0);
 }
 
 function getDisplayRecord(record) {
