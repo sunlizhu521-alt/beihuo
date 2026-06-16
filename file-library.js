@@ -35,7 +35,6 @@ const DETAIL_COLUMNS = [
   { key: "applicant", label: "申请人" },
   { key: "supplierShortName", label: "供应商简称" },
   { key: "oaProcessNo", label: "OA备货流程号" },
-  { key: "stockReason", label: "备货原因" },
   { key: "purchaseEntity", label: "采购主体" },
   { key: "materialCode", label: "物料编码" },
   { key: "sku", label: "SKU" },
@@ -45,6 +44,7 @@ const DETAIL_COLUMNS = [
   { key: "requiredReadyDate", label: "要求货好时间" },
   { key: "minimumOrderQuantity", label: "起订量" },
   { key: "minimumOrderStatus", label: "起订量是否满足" },
+  { key: "stockReason", label: "备货原因" },
 ];
 const TABLE_FIELD_ALIASES = {
   productLine: ["销售产品线", "产品线", "一级产品线", "销售线"],
@@ -1109,7 +1109,7 @@ function getExportColumnWidth(key) {
     applicant: 14,
     supplierShortName: 20,
     oaProcessNo: 20,
-    stockReason: 22,
+    stockReason: 90,
     purchaseEntity: 18,
     materialCode: 18,
     sku: 16,
