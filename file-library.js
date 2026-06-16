@@ -41,6 +41,8 @@ const DETAIL_COLUMNS = [
   { key: "materialName", label: "物料名称" },
   { key: "quantity", label: "数量" },
   { key: "requiredReadyDate", label: "要求货好时间" },
+  { key: "minimumOrderQuantity", label: "起订量" },
+  { key: "minimumOrderStatus", label: "起订量是否满足" },
 ];
 const TABLE_FIELD_ALIASES = {
   productLine: ["销售产品线", "产品线", "一级产品线", "销售线"],
@@ -324,6 +326,7 @@ async function buildDemandAllocationRows(records) {
   ]);
   const categoryIndex = buildCategoryIndex(categoryRows);
   const divisionIndex = buildPurchaseDivisionIndex(divisionRows);
+  const minimumOrderIndex = buildMinimumOrderIndex(divisionRows);
   const rosterIndex = buildRosterIndex(rosterRows);
 
   return demandRows.flatMap(({ rows, source }) => {
@@ -358,6 +361,9 @@ async function buildDemandAllocationRows(records) {
       const groupMaterialKey = makeGroupMaterialKey(purchaseGroup, materialCode);
       const groupDivisionRows = divisionIndex.byGroupMaterial.get(groupMaterialKey) || [];
       const materialDivisionRows = divisionIndex.byMaterial.get(materialKey) || [];
+      const minimumOrderQuantityNumber = minimumOrderIndex.byMaterial.get(materialKey);
+      const minimumOrderQuantity = Number.isFinite(minimumOrderQuantityNumber) ? formatPlainNumber(minimumOrderQuantityNumber) : "";
+      const minimumOrderStatus = getMinimumOrderStatus(quantityNumber, minimumOrderQuantityNumber);
       const buyerRows = groupDivisionRows.length ? groupDivisionRows : materialDivisionRows;
       const buyer = joinUnique(buyerRows.map((item) => item.buyer));
       const supplierShortName = joinUnique(materialDivisionRows.map((item) => item.supplierShortName));
@@ -377,6 +383,8 @@ async function buildDemandAllocationRows(records) {
         materialName: category.materialName || "",
         quantity,
         requiredReadyDate,
+        minimumOrderQuantity,
+        minimumOrderStatus,
         quantityNumber,
         sourceFile: source.fileName,
         sourceSheet: source.sheetName,
@@ -503,6 +511,34 @@ function buildPurchaseDivisionIndex(tables) {
     });
   });
   return { byMaterial, byGroupMaterial, materialCodes };
+}
+
+function buildMinimumOrderIndex(tables) {
+  const byMaterial = new Map();
+  tables
+    .filter((table) => String(table.source?.sheetName || "").trim().includes("产品线明细"))
+    .forEach(({ rows }) => {
+      const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码"]);
+      const columnMap = headerIndex >= 0
+        ? buildColumnMapByAliases(rows[headerIndex], {
+          materialCode: TABLE_FIELD_ALIASES.divisionMaterialCode,
+        })
+        : {};
+      const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
+      rows.slice(startIndex).forEach((row) => {
+        const materialCode = getCellValue(row, columnMap.materialCode ?? 0);
+        const materialKey = normalizeLookupKey(materialCode);
+        if (!materialKey) return;
+        const minimumOrderQuantity = forceDemandNumber(row?.[9]);
+        if (Number.isFinite(minimumOrderQuantity)) byMaterial.set(materialKey, minimumOrderQuantity);
+      });
+    });
+  return { byMaterial };
+}
+
+function getMinimumOrderStatus(quantityNumber, minimumOrderQuantityNumber) {
+  if (!Number.isFinite(quantityNumber) || !Number.isFinite(minimumOrderQuantityNumber)) return "";
+  return quantityNumber >= minimumOrderQuantityNumber ? "满足" : "不满足";
 }
 
 function buildRosterIndex(tables) {
@@ -926,6 +962,8 @@ function getExportColumnWidth(key) {
     materialName: 28,
     quantity: 12,
     requiredReadyDate: 18,
+    minimumOrderQuantity: 12,
+    minimumOrderStatus: 14,
   }[key] || 14;
 }
 
