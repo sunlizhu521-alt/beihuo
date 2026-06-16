@@ -518,7 +518,7 @@ function buildMinimumOrderIndex(tables) {
   tables
     .filter((table) => String(table.source?.sheetName || "").trim().includes("产品线明细"))
     .forEach(({ rows }) => {
-      const headerIndex = findHeaderRowIndex(rows, ["物料编码", "识别码"]);
+      const headerIndex = findHeaderRowIndex(rows, TABLE_FIELD_ALIASES.divisionMaterialCode, 1);
       const columnMap = headerIndex >= 0
         ? buildColumnMapByAliases(rows[headerIndex], {
           materialCode: TABLE_FIELD_ALIASES.divisionMaterialCode,
@@ -555,7 +555,7 @@ function buildRosterIndex(tables) {
   return { byName };
 }
 
-function findHeaderRowIndex(rows, aliases) {
+function findHeaderRowIndex(rows, aliases, minimumScore = 2) {
   let bestIndex = -1;
   let bestScore = 0;
   const normalizedAliases = aliases.map(normalizeDemandHeader).filter(Boolean);
@@ -569,7 +569,7 @@ function findHeaderRowIndex(rows, aliases) {
       bestScore = score;
     }
   });
-  return bestScore >= 2 ? bestIndex : -1;
+  return bestScore >= minimumScore ? bestIndex : -1;
 }
 
 function buildColumnMapByAliases(headerRow = [], aliasMap = {}) {
