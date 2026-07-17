@@ -765,6 +765,37 @@ h2 {
   background: #f8fbff;
 }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.pagination-controls[hidden] {
+  display: none;
+}
+
+.pagination-controls > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-actions button {
+  min-width: 74px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
 .empty-state {
   padding: 18px;
   border: 1px dashed var(--line);
@@ -831,6 +862,15 @@ h2 {
 
   .detail-filter-row {
     grid-template-columns: 1fr;
+  }
+
+  .pagination-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pagination-actions button {
+    flex: 1;
   }
 
   .multi-filter,

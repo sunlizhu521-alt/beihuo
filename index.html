@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>备货需求分配 - 备货需求分配</title>
-    <link rel="stylesheet" href="./styles.css?v=20260717-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -121,6 +121,13 @@
             </table>
             <div class="empty-state" id="detailEmpty">上传并应用表格后显示明细</div>
           </div>
+          <nav class="pagination-controls" id="paginationControls" aria-label="备货需求分配明细分页" hidden>
+            <span id="paginationInfo">第 1 / 1 页</span>
+            <div class="pagination-actions">
+              <button id="previousPageButton" type="button" aria-label="上一页">上一页</button>
+              <button id="nextPageButton" type="button" aria-label="下一页">下一页</button>
+            </div>
+          </nav>
         </section>
 
         <section class="panel field-source-panel" aria-labelledby="fieldSourceTitle">
@@ -170,6 +177,6 @@
     <script src="./vendor/xlsx.full.min.js?v=20260601-1"></script>
     <script src="./vendor/jszip.min.js?v=20260609-1"></script>
     <script src="./shared-library.js?v=20260609-3"></script>
-    <script src="./file-library.js?v=20260609-34"></script>
+    <script src="./file-library.js?v=20260717-2"></script>
   </body>
 </html>

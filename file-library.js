@@ -10,6 +10,7 @@ const slots = [
 ];
 
 const TABLE_FILE_ACCEPT = ".xlsx,.xls,.xlsm,.csv";
+const DETAIL_PAGE_SIZE = 20;
 const SLOT_IDS = {
   category: "file-1",
   purchaseDivision: "file-2",
@@ -81,12 +82,17 @@ const els = {
   detailState: document.querySelector("#detailState"),
   detailTableBody: document.querySelector("#detailTableBody"),
   detailEmpty: document.querySelector("#detailEmpty"),
+  paginationControls: document.querySelector("#paginationControls"),
+  paginationInfo: document.querySelector("#paginationInfo"),
+  previousPageButton: document.querySelector("#previousPageButton"),
+  nextPageButton: document.querySelector("#nextPageButton"),
 };
 
 const state = {
   records: new Map(),
   demandRows: [],
   filteredRows: [],
+  currentPage: 1,
   filterOptions: Object.fromEntries(FILTER_DEFINITIONS.map((filter) => [filter.key, []])),
   filters: new Map(FILTER_DEFINITIONS.map((filter) => [filter.key, new Set()])),
 };
@@ -148,6 +154,8 @@ function bindEvents() {
   els.filterToolbar?.addEventListener("change", handleFilterToolbarChange);
   els.clearFiltersButton?.addEventListener("click", clearAllFilters);
   els.downloadDetailButton?.addEventListener("click", downloadDetailWorkbook);
+  els.previousPageButton?.addEventListener("click", () => changeDetailPage(-1));
+  els.nextPageButton?.addEventListener("click", () => changeDetailPage(1));
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".multi-filter")) closeFilterMenus();
   });
@@ -288,6 +296,7 @@ async function clearLibraryCache() {
 }
 
 async function refreshDemandDashboard() {
+  state.currentPage = 1;
   if (!window.XLSX) {
     state.demandRows = [];
     state.filteredRows = [];
@@ -761,9 +770,11 @@ function renderSlot(slot) {
 
 function renderDemandDashboard(emptyMessage = "暂无匹配数据") {
   state.filteredRows = getFilteredDemandRows();
+  clampCurrentPage();
   updateDemandMetrics();
   renderFilterControls();
   renderDemandTable(emptyMessage);
+  renderPagination();
 }
 
 function getFilteredDemandRows() {
@@ -865,6 +876,7 @@ function handleFilterToolbarChange(event) {
     selected.delete(input.value);
   }
   state.filters.set(input.dataset.filterKey, selected);
+  state.currentPage = 1;
   rebuildFilterOptions();
   pruneFilterSelections();
   renderDemandDashboard();
@@ -872,6 +884,7 @@ function handleFilterToolbarChange(event) {
 
 function clearAllFilters() {
   FILTER_DEFINITIONS.forEach((filter) => state.filters.set(filter.key, new Set()));
+  state.currentPage = 1;
   closeFilterMenus();
   rebuildFilterOptions();
   renderDemandDashboard();
@@ -883,15 +896,51 @@ function closeFilterMenus() {
 
 function renderDemandTable(emptyMessage) {
   if (!els.detailTableBody || !els.detailEmpty) return;
-  const rows = state.filteredRows;
+  const rows = getCurrentPageRows();
   els.detailTableBody.innerHTML = rows.map(renderDemandTableRow).join("");
-  els.detailEmpty.hidden = rows.length > 0;
+  els.detailEmpty.hidden = state.filteredRows.length > 0;
   els.detailEmpty.textContent = state.demandRows.length ? emptyMessage : "上传并应用表格后显示明细";
   if (els.detailState) {
-    els.detailState.textContent = rows.length
-      ? `显示 ${formatMetricNumber(rows.length)} 条`
+    const startRow = (state.currentPage - 1) * DETAIL_PAGE_SIZE + 1;
+    const endRow = Math.min(state.currentPage * DETAIL_PAGE_SIZE, state.filteredRows.length);
+    els.detailState.textContent = state.filteredRows.length
+      ? `第 ${formatMetricNumber(startRow)}–${formatMetricNumber(endRow)} 条，共 ${formatMetricNumber(state.filteredRows.length)} 条`
       : state.demandRows.length ? "无匹配数据" : "暂无数据";
   }
+}
+
+function getPageCount() {
+  return Math.max(1, Math.ceil(state.filteredRows.length / DETAIL_PAGE_SIZE));
+}
+
+function clampCurrentPage() {
+  state.currentPage = Math.min(Math.max(1, state.currentPage), getPageCount());
+}
+
+function getCurrentPageRows() {
+  const startIndex = (state.currentPage - 1) * DETAIL_PAGE_SIZE;
+  return state.filteredRows.slice(startIndex, startIndex + DETAIL_PAGE_SIZE);
+}
+
+function changeDetailPage(offset) {
+  const nextPage = Math.min(Math.max(1, state.currentPage + offset), getPageCount());
+  if (nextPage === state.currentPage) return;
+  state.currentPage = nextPage;
+  renderDemandTable();
+  renderPagination();
+  els.detailTableBody?.closest(".table-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderPagination() {
+  if (!els.paginationControls) return;
+  const totalRows = state.filteredRows.length;
+  const pageCount = getPageCount();
+  els.paginationControls.hidden = totalRows === 0;
+  if (els.paginationInfo) {
+    els.paginationInfo.textContent = `第 ${state.currentPage} / ${pageCount} 页｜共 ${formatMetricNumber(totalRows)} 条｜每页 ${DETAIL_PAGE_SIZE} 条`;
+  }
+  if (els.previousPageButton) els.previousPageButton.disabled = state.currentPage <= 1;
+  if (els.nextPageButton) els.nextPageButton.disabled = state.currentPage >= pageCount;
 }
 
 function renderDemandTableRow(row) {
