@@ -653,6 +653,59 @@ h2 {
   overflow: visible;
 }
 
+.field-source-panel {
+  margin-top: 16px;
+}
+
+.field-source-note {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--blue);
+  border-radius: 0 6px 6px 0;
+  color: #40536a;
+  background: #f4f8ff;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.field-source-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.field-source-table th,
+.field-source-table td {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.field-source-table th {
+  color: var(--ink);
+  background: #eef5ff;
+  text-align: center;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.field-source-table td:first-child,
+.field-source-table td:nth-child(2),
+.field-source-table td:nth-child(3) {
+  text-align: center;
+}
+
+.field-source-table td:first-child {
+  color: #173f77;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.field-source-table tbody tr:nth-child(even) td {
+  background: #f8fbff;
+}
+
 .detail-filter-row {
   position: relative;
   z-index: 70;
