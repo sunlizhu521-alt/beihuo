@@ -30,7 +30,6 @@ const LINKED_FILTER_GROUPS = [
   ["purchaseGroup", "buyer"],
 ];
 const DETAIL_COLUMNS = [
-  { key: "purchaseGroup", label: "采购组" },
   { key: "buyer", label: "采购单订单下单人" },
   { key: "businessUnit", label: "事业部" },
   { key: "applicant", label: "申请人" },
