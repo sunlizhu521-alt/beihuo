@@ -160,7 +160,7 @@
                 <tr><td>SKU</td><td>Dim-YL医疗器械商品分类</td><td>SKU（C列）</td><td>按物料编码匹配商品分类表后取得。</td></tr>
                 <tr><td>采购分工明细是否存在</td><td>系统计算</td><td>物料编码</td><td>物料编码存在于 Dim-采购部分工明细时显示“是”，否则显示“否”。</td></tr>
                 <tr><td>物料名称</td><td>Dim-YL医疗器械商品分类</td><td>金蝶名称 / 物料名称（D列）</td><td>按物料编码匹配商品分类表后取得。</td></tr>
-                <tr><td>数量</td><td>备货需求表</td><td>数量</td><td>优先读取“数量”列；未识别到时取该行最后一个正数。</td></tr>
+                <tr><td>数量</td><td>备货需求表</td><td>数量</td><td>读取“数量”列；存在同名列时，读取紧邻“要求货好时间”前的明细数量。缺失、无法定位或非数字时留空并提示待核对，不从其他字段取数。</td></tr>
                 <tr><td>要求货好时间</td><td>备货需求表</td><td>要求货好时间 / 要求货好日期等</td><td>直接读取要求货好时间类字段。</td></tr>
                 <tr><td>起订量</td><td>Dim-采购部分工明细</td><td>“产品线明细”工作表 J列</td><td>仅从名称包含“产品线明细”的工作表读取，按物料编码匹配。</td></tr>
                 <tr><td>起订量是否满足</td><td>系统计算</td><td>数量、起订量</td><td>数量大于或等于起订量时显示“满足”，否则显示“不满足”；缺少任一数值时留空。</td></tr>
@@ -175,6 +175,6 @@
     <script src="./vendor/xlsx.full.min.js?v=20260601-1"></script>
     <script src="./vendor/jszip.min.js?v=20260609-1"></script>
     <script src="./shared-library.js?v=20260609-3"></script>
-    <script src="./file-library.js?v=20260921-1"></script>
+    <script src="./file-library.js?v=20260921-2"></script>
   </body>
 </html>

@@ -357,7 +357,7 @@ async function buildDemandAllocationRows(records) {
       purchaseEntity: TABLE_FIELD_ALIASES.demandPurchaseEntity,
       requiredReadyDate: TABLE_FIELD_ALIASES.demandRequiredReadyDate,
     });
-    columnMap.quantity = findExactHeaderColumnIndex(rows[headerIndex], "数量");
+    columnMap.quantity = findDemandQuantityColumnIndex(rows[headerIndex], columnMap);
     if (columnMap.materialCode === undefined) return [];
 
     return rows.slice(headerIndex + 1).map((row, rowOffset) => {
@@ -629,13 +629,22 @@ function getCellValue(row, columnIndex) {
 }
 
 function getDemandRowQuantity(row, columnMap) {
-  const mappedQuantity = forceDemandNumber(row?.[columnMap.quantity]);
-  if (Number.isFinite(mappedQuantity)) return mappedQuantity;
-  const materialIndex = columnMap.materialCode ?? -1;
-  const candidates = row
-    .map((value, index) => ({ value: forceDemandNumber(value), index }))
-    .filter((cell) => cell.index !== materialIndex && Number.isFinite(cell.value) && cell.value > 0);
-  return candidates.length ? candidates.at(-1).value : NaN;
+  const value = row?.[columnMap.quantity];
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  const text = String(value ?? "").trim();
+  if (!/^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(text)) return NaN;
+  const number = Number(text.replace(/,/g, ""));
+  return Number.isFinite(number) ? number : NaN;
+}
+
+function findDemandQuantityColumnIndex(headerRow, columnMap) {
+  const quantityColumns = headerRow.flatMap((header, index) =>
+    normalizeDemandHeader(header) === "数量" ? [index] : []
+  );
+  if (quantityColumns.length === 1) return quantityColumns[0];
+  // OA 导出同时包含调库存数量和备货明细数量，后者紧邻货好时间。
+  const detailQuantityIndex = columnMap.requiredReadyDate - 1;
+  return quantityColumns.includes(detailQuantityIndex) ? detailQuantityIndex : undefined;
 }
 
 function normalizeLookupKey(value) {
@@ -788,12 +797,12 @@ function getFilteredDemandRows() {
 
 function updateDemandMetrics() {
   const quantityValues = state.filteredRows.map((row) => row.quantityNumber).filter(Number.isFinite);
-  const total = quantityValues.length
-    ? quantityValues.reduce((sum, value) => sum + value, 0)
-    : state.filteredRows.length;
+  const total = quantityValues.reduce((sum, value) => sum + value, 0);
+  const unresolvedCount = state.filteredRows.length - quantityValues.length;
+  const quantityWarning = unresolvedCount ? `（${unresolvedCount} 条数量待核对）` : "";
   const supplierCount = new Set(state.filteredRows.flatMap((row) => splitMultiValue(row.supplierShortName))).size;
-  if (els.beihuoTotal) els.beihuoTotal.textContent = formatMetricNumber(total);
-  if (els.quantityTotal) els.quantityTotal.textContent = `数量合计：${formatMetricNumber(total)}`;
+  if (els.beihuoTotal) els.beihuoTotal.textContent = unresolvedCount ? "待核对" : formatMetricNumber(total);
+  if (els.quantityTotal) els.quantityTotal.textContent = `数量合计：${formatMetricNumber(total)}${quantityWarning}`;
   if (els.supplierCount) els.supplierCount.textContent = formatMetricNumber(supplierCount);
   if (els.downloadDetailButton) els.downloadDetailButton.disabled = !state.filteredRows.length || !window.XLSX;
 }
