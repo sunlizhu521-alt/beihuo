@@ -20,6 +20,31 @@ function loadApp() {
   return { context, elements, run: (code) => vm.runInContext(code, context) };
 }
 
+test('all 15 table headers, rendered values and exported cells follow the requested order', async () => {
+  const { context, run } = loadApp();
+  const expected = [
+    ['采购单订单下单人', 'buyer'], ['事业部', 'businessUnit'], ['申请人', 'applicant'],
+    ['供应商简称', 'supplierShortName'], ['物料编码', 'materialCode'], ['SKU', 'sku'],
+    ['物料名称', 'materialName'], ['数量', 'quantity'], ['OA备货流程号', 'oaProcessNo'],
+    ['采购主体', 'purchaseEntity'], ['采购分工明细是否存在', 'materialCodeValid'],
+    ['要求货好时间', 'requiredReadyDate'], ['起订量', 'minimumOrderQuantity'],
+    ['起订量是否满足', 'minimumOrderStatus'], ['备货原因', 'stockReason'],
+  ];
+  const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const header = html.match(/<table class="detail-table">([\s\S]*?)<\/thead>/)[1];
+  assert.deepEqual([...header.matchAll(/<th>(.*?)<\/th>/g)].map(match => match[1]), expected.map(item => item[0]));
+  context.row = Object.fromEntries(expected.map(([, key], index) => [key, `value-${index + 1}`]));
+  const cells = [...run('renderDemandTableRow(row)').matchAll(/<td>(.*?)<\/td>/g)].map(match => match[1]);
+  assert.deepEqual(cells, expected.map((_, index) => `value-${index + 1}`));
+  let exported;
+  context.window.XLSX.writeFile = (output) => { exported = output; };
+  run('state.filteredRows = [row]');
+  await run('downloadDetailWorkbook()');
+  const output = XLSX.utils.sheet_to_json(exported.Sheets[exported.SheetNames[0]], { header: 1 });
+  assert.deepEqual(output[0], expected.map(item => item[0]));
+  assert.deepEqual(output[1], cells);
+});
+
 test('same material merges across sheets with unique OA numbers, summed quantity and matching export', async () => {
   const { context, elements, run } = loadApp();
   const workbook = XLSX.utils.book_new();
