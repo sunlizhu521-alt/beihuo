@@ -20,6 +20,85 @@ function loadApp() {
   return { context, elements, run: (code) => vm.runInContext(code, context) };
 }
 
+test('same material merges across sheets with unique OA numbers, summed quantity and matching export', async () => {
+  const { context, elements, run } = loadApp();
+  const workbook = XLSX.utils.book_new();
+  const header = ['创建人', '数量', '要求货好时间', '识别码', '流程号', '备货原因', '采购主体'];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    header,
+    ['甲', 3, '2026-10-01', 'TEST-001', 'OA001', '原因甲', '主体甲'],
+    ['甲', 2, '2026-10-01', 'TEST-001', 'OA001', '原因甲', '主体甲'],
+    ['甲', 4, '2026-10-01', 'TEST-002', 'OA003', '', ''],
+  ]), '需求一');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    header, ['乙', 5, '2026-10-02', 'TEST-001', 'OA002', '原因乙', '主体乙'],
+  ]), '需求二');
+  const division = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(division, XLSX.utils.aoa_to_sheet([
+    ['物料编码', '采购单订单下单人', '供应商简称', '', '', '', '', '', '', '起订量'],
+    ['TEST-001', '采购甲', '供应商甲', '', '', '', '', '', '', 8],
+  ]), '产品线明细');
+  const record = (wb) => {
+    const bytes = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return { name: 'synthetic.xlsx', file: { name: 'synthetic.xlsx', arrayBuffer: async () => bytes } };
+  };
+  context.records = { demand: record(workbook), purchaseDivision: record(division) };
+  const rows = await run('buildDemandAllocationRows(records)');
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].oaProcessNo, 'OA001/OA002');
+  assert.equal(rows[0].quantityNumber, 10);
+  assert.equal(rows[0].minimumOrderStatus, '满足');
+  assert.equal(rows[0].applicant, '甲、乙');
+  assert.equal(rows[0].requiredReadyDate, '2026-10-01、2026-10-02');
+  assert.equal(rows[0].stockReason, '原因甲、原因乙');
+  assert.equal(rows[0].purchaseEntity, '主体甲、主体乙');
+  assert.equal(rows[0].sourceRows.length, 3);
+  assert.equal(rows[1].quantityNumber, 4);
+  context.rows = rows;
+  run('state.demandRows = rows; state.filteredRows = getFilteredDemandRows(); updateDemandMetrics()');
+  assert.equal(elements.get('#beihuoTotal').textContent, '14');
+  assert.match(run('renderDemandTableRow(rows[0])'), /OA001\/OA002/);
+  run('state.filters.set("buyer", new Set(["采购甲"])); state.filteredRows = getFilteredDemandRows(); updateDemandMetrics()');
+  assert.equal(elements.get('#beihuoTotal').textContent, '10');
+  let exported;
+  context.window.XLSX.writeFile = (output) => { exported = output; };
+  await run('downloadDetailWorkbook()');
+  assert.deepEqual(exported.SheetNames, ['采购甲']);
+  const output = XLSX.utils.sheet_to_json(exported.Sheets['采购甲'], { header: 1 });
+  assert.equal(output.length, 2);
+  assert.equal(output[1][output[0].indexOf('数量')], '10');
+  assert.equal(output[1][output[0].indexOf('OA备货流程号')], 'OA001/OA002');
+});
+
+test('merge preserves blank codes and handles unknown, zero, signed decimal and overflowing quantities', () => {
+  const { context, elements, run } = loadApp();
+  const row = (materialCode, quantityNumber, oaProcessNo = '') => ({ materialCode, quantityNumber, oaProcessNo, minimumOrderQuantity: '1' });
+  context.rows = [
+    row('A', 2, 'OA1'), row('A', NaN, 'OA2'),
+    row('B', 0, 'OA3'), row('B', 0, 'OA3'),
+    row('C', -2), row('C', 2.5),
+    row('', 1, 'OA4'), row(' ', 2, 'OA5'),
+    row('D', Number.MAX_VALUE), row('D', Number.MAX_VALUE),
+    row('E', NaN), row('E', NaN),
+  ];
+  const rows = run('mergeDemandRowsByMaterial(rows)');
+  assert.equal(rows.length, 7);
+  assert(Number.isNaN(rows[0].quantityNumber));
+  assert.equal(rows[0].quantity, '');
+  assert.equal(rows[0].minimumOrderStatus, '');
+  assert.equal(rows[1].quantity, '0');
+  assert.equal(rows[1].oaProcessNo, 'OA3');
+  assert.equal(rows[2].quantity, '0.5');
+  assert.equal(rows[2].minimumOrderStatus, '不满足');
+  assert.equal(rows[3].oaProcessNo, 'OA4');
+  assert.equal(rows[4].oaProcessNo, 'OA5');
+  assert(Number.isNaN(rows[5].quantityNumber));
+  assert(Number.isNaN(rows[6].quantityNumber));
+  context.merged = rows;
+  run('state.filteredRows = merged; updateDemandMetrics()');
+  assert.equal(elements.get('#beihuoTotal').textContent, '待核对');
+});
+
 test('duplicate quantity headers select demand detail, never SKU digits or transfer quantity', () => {
   const { context, run } = loadApp();
   context.headers = ['创建人', '数量', '品名', '数量', '要求货好时间', 'sku', '识别码'];

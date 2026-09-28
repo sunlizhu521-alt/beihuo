@@ -341,7 +341,7 @@ async function buildDemandAllocationRows(records) {
   const minimumOrderIndex = buildMinimumOrderIndex(divisionRows);
   const rosterIndex = buildRosterIndex(rosterRows);
 
-  return demandRows.flatMap(({ rows, source }) => {
+  const detailRows = demandRows.flatMap(({ rows, source }) => {
     const headerIndex = findHeaderRowIndex(rows, [
       ...TABLE_FIELD_ALIASES.demandApplicant,
       ...TABLE_FIELD_ALIASES.demandMaterialCode,
@@ -410,6 +410,46 @@ async function buildDemandAllocationRows(records) {
         sourceRowNumber: headerIndex + rowOffset + 2,
       };
     }).filter(Boolean);
+  });
+  return mergeDemandRowsByMaterial(detailRows);
+}
+
+function mergeDemandRowsByMaterial(rows) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    // 无物料编码的记录不能视为同一物料。
+    const key = normalizeLookupKey(row.materialCode) || Symbol();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+  return [...groups.values()].map((items) => {
+    const merged = { ...items[0] };
+    const fields = new Set([
+      ...DETAIL_COLUMNS.map((column) => column.key),
+      ...FILTER_DEFINITIONS.map((filter) => filter.key),
+    ]);
+    fields.forEach((key) => {
+      if (["materialCode", "quantity", "minimumOrderStatus"].includes(key)) return;
+      const values = [...new Set(items.map((row) => String(row[key] ?? "").trim()).filter(Boolean))];
+      merged[key] = values.join(key === "oaProcessNo" ? "/" : "、");
+    });
+    // 任一来源数量缺失时，不把部分合计当成完整需求量。
+    const sum = items.every((row) => Number.isFinite(row.quantityNumber))
+      ? items.reduce((total, row) => total + row.quantityNumber, 0)
+      : NaN;
+    merged.quantityNumber = Number.isFinite(sum) ? sum : NaN;
+    merged.quantity = formatPlainNumber(merged.quantityNumber);
+    const minimum = merged.minimumOrderQuantity === "" ? NaN : Number(merged.minimumOrderQuantity);
+    merged.minimumOrderStatus = getMinimumOrderStatus(merged.quantityNumber, minimum);
+    merged.sourceRows = items.map((row) => ({
+      sourceFile: row.sourceFile,
+      sourceSheet: row.sourceSheet,
+      sourceSlotId: row.sourceSlotId,
+      sourceRowNumber: row.sourceRowNumber,
+      oaProcessNo: row.oaProcessNo,
+      quantityNumber: row.quantityNumber,
+    }));
+    return merged;
   });
 }
 
