@@ -20,14 +20,14 @@ function loadApp() {
   return { context, elements, run: (code) => vm.runInContext(code, context) };
 }
 
-test('all 16 table headers, rendered values and exported cells follow the requested order', async () => {
+test('all 17 table headers, rendered values and exported cells follow the requested order', async () => {
   const { context, run } = loadApp();
   const expected = [
     ['采购单订单下单人', 'buyer'], ['事业部', 'businessUnit'], ['申请人', 'applicant'],
     ['供应商简称', 'supplierShortName'], ['物料编码', 'materialCode'], ['SKU', 'sku'],
     ['物料名称', 'materialName'], ['数量', 'quantity'], ['OA备货流程号', 'oaProcessNo'],
     ['采购主体', 'purchaseEntity'], ['采购分工明细是否存在', 'materialCodeValid'],
-    ['供应商反馈交期', 'supplierDeliveryDate'], ['要求货好时间', 'requiredReadyDate'], ['起订量', 'minimumOrderQuantity'],
+    ['供应商反馈交期', 'supplierDeliveryDate'], ['采购单订单号', 'purchaseOrderNo'], ['要求货好时间', 'requiredReadyDate'], ['起订量', 'minimumOrderQuantity'],
     ['起订量是否满足', 'minimumOrderStatus'], ['备货原因', 'stockReason'],
   ];
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -79,6 +79,7 @@ test('same material merges across sheets with unique OA numbers, summed quantity
   assert.equal(rows[0].purchaseEntity, '主体甲、主体乙');
   assert.equal(rows[0].sourceRows.length, 3);
   assert.equal(rows[0].supplierDeliveryDate, '');
+  assert.equal(rows[0].purchaseOrderNo, '');
   assert.equal(rows[1].quantityNumber, 4);
   context.rows = rows;
   run('state.demandRows = rows; state.filteredRows = getFilteredDemandRows(); updateDemandMetrics()');
@@ -94,6 +95,7 @@ test('same material merges across sheets with unique OA numbers, summed quantity
   assert.equal(output.length, 2);
   assert.equal(output[1][output[0].indexOf('数量')], '10');
   assert.equal(output[1][output[0].indexOf('OA备货流程号')], 'OA001/OA002');
+  assert.equal(output[1][output[0].indexOf('采购单订单号')], '');
 });
 
 test('merge preserves blank codes and handles unknown, zero, signed decimal and overflowing quantities', () => {

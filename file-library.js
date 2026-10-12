@@ -42,6 +42,7 @@ const DETAIL_COLUMNS = [
   { key: "purchaseEntity", label: "采购主体" },
   { key: "materialCodeValid", label: "采购分工明细是否存在" },
   { key: "supplierDeliveryDate", label: "供应商反馈交期" },
+  { key: "purchaseOrderNo", label: "采购单订单号" },
   { key: "requiredReadyDate", label: "要求货好时间" },
   { key: "minimumOrderQuantity", label: "起订量" },
   { key: "minimumOrderStatus", label: "起订量是否满足" },
