@@ -1012,19 +1012,14 @@ async function downloadDetailWorkbook() {
   }
 
   const workbook = window.XLSX.utils.book_new();
-  const usedSheetNames = new Set();
-  const sheetShapes = [];
-  groupRowsByBuyer(state.filteredRows).forEach(([buyer, rows]) => {
-    const sheetName = makeUniqueSheetName(buyer, usedSheetNames);
-    const sheetRows = [
-      DETAIL_COLUMNS.map((column) => column.label),
-      ...rows.map((row) => DETAIL_COLUMNS.map((column) => row[column.key] || "")),
-    ];
-    const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
-    worksheet["!cols"] = getAutoExportColumns(sheetRows);
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    sheetShapes.push({ rowCount: sheetRows.length, columnCount: DETAIL_COLUMNS.length });
-  });
+  const sheetRows = [
+    DETAIL_COLUMNS.map((column) => column.label),
+    ...state.filteredRows.map((row) => DETAIL_COLUMNS.map((column) => row[column.key] || "")),
+  ];
+  const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
+  worksheet["!cols"] = getAutoExportColumns(sheetRows);
+  window.XLSX.utils.book_append_sheet(workbook, worksheet, "备货需求分配明细");
+  const sheetShapes = [{ rowCount: sheetRows.length, columnCount: DETAIL_COLUMNS.length }];
 
   const fileName = `备货需求分配明细_${formatFileTimestamp(new Date())}.xlsx`;
   if (!window.JSZip) {

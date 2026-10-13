@@ -45,6 +45,37 @@ test('all 17 table headers, rendered values and exported cells follow the reques
   assert.deepEqual(output[1], cells);
 });
 
+test('all buyers and pages export into one sheet in display order on both export paths', async () => {
+  const { context, run } = loadApp();
+  context.rows = Array.from({ length: 23 }, (_, i) => ({
+    buyer: ['采购乙', '采购甲', ''][i % 3],
+    materialCode: `TEST-${i}`, quantity: String(i),
+    purchaseOrderNo: i === 0 ? 'PO001' : '', supplierDeliveryDate: '',
+  }));
+  run('state.filteredRows = rows; state.currentPage = 2');
+  let exported;
+  context.window.XLSX.writeFile = workbook => { exported = workbook; };
+  await run('downloadDetailWorkbook()');
+  const verify = workbook => {
+    assert.deepEqual(Array.from(workbook.SheetNames), ['备货需求分配明细']);
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+    assert.equal(data.length, 24);
+    for (const key of ['buyer', 'materialCode', 'quantity', 'purchaseOrderNo', 'supplierDeliveryDate']) {
+      const labels = { buyer: '采购单订单下单人', materialCode: '物料编码', quantity: '数量', purchaseOrderNo: '采购单订单号', supplierDeliveryDate: '供应商反馈交期' };
+      assert.deepEqual(data.slice(1).map(row => row[data[0].indexOf(labels[key])]), context.rows.map(row => row[key]));
+    }
+  };
+  verify(exported);
+  context.window.JSZip = {};
+  let styled;
+  context.captureStyled = (workbook, shapes) => { styled = { workbook, shapes }; };
+  run('writeStyledDetailWorkbook = captureStyled');
+  await run('downloadDetailWorkbook()');
+  assert(styled, 'styled export must receive the single-sheet workbook');
+  assert.deepEqual(JSON.parse(JSON.stringify(styled.shapes)), [{ rowCount: 24, columnCount: 17 }]);
+  verify(XLSX.read(XLSX.write(styled.workbook, { type: 'buffer', bookType: 'xlsx' }), { type: 'buffer' }));
+});
+
 test('same material merges across sheets with unique OA numbers, summed quantity and matching export', async () => {
   const { context, elements, run } = loadApp();
   const workbook = XLSX.utils.book_new();
@@ -90,8 +121,8 @@ test('same material merges across sheets with unique OA numbers, summed quantity
   let exported;
   context.window.XLSX.writeFile = (output) => { exported = output; };
   await run('downloadDetailWorkbook()');
-  assert.deepEqual(exported.SheetNames, ['采购甲']);
-  const output = XLSX.utils.sheet_to_json(exported.Sheets['采购甲'], { header: 1 });
+  assert.deepEqual(exported.SheetNames, ['备货需求分配明细']);
+  const output = XLSX.utils.sheet_to_json(exported.Sheets['备货需求分配明细'], { header: 1 });
   assert.equal(output.length, 2);
   assert.equal(output[1][output[0].indexOf('数量')], '10');
   assert.equal(output[1][output[0].indexOf('OA备货流程号')], 'OA001/OA002');
