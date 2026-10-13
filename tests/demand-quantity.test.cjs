@@ -42,7 +42,7 @@ test('all 17 table headers, rendered values and exported cells follow the reques
   await run('downloadDetailWorkbook()');
   const output = XLSX.utils.sheet_to_json(exported.Sheets[exported.SheetNames[0]], { header: 1 });
   assert.deepEqual(output[0], expected.map(item => item[0]));
-  assert.deepEqual(output[1], cells);
+  assert.deepEqual(output[1], cells.map((value, i) => expected[i][1] === 'quantity' ? '' : value));
 });
 
 test('all buyers and pages export into one sheet in display order on both export paths', async () => {
@@ -62,7 +62,7 @@ test('all buyers and pages export into one sheet in display order on both export
     assert.equal(data.length, 24);
     for (const key of ['buyer', 'materialCode', 'quantity', 'purchaseOrderNo', 'supplierDeliveryDate']) {
       const labels = { buyer: '采购单订单下单人', materialCode: '物料编码', quantity: '数量', purchaseOrderNo: '采购单订单号', supplierDeliveryDate: '供应商反馈交期' };
-      assert.deepEqual(data.slice(1).map(row => row[data[0].indexOf(labels[key])]), context.rows.map(row => row[key]));
+      assert.deepEqual(data.slice(1).map(row => row[data[0].indexOf(labels[key])]), context.rows.map(row => key === 'quantity' ? Number(row[key]) : row[key]));
     }
   };
   verify(exported);
@@ -74,6 +74,28 @@ test('all buyers and pages export into one sheet in display order on both export
   assert(styled, 'styled export must receive the single-sheet workbook');
   assert.deepEqual(JSON.parse(JSON.stringify(styled.shapes)), [{ rowCount: 24, columnCount: 17 }]);
   verify(XLSX.read(XLSX.write(styled.workbook, { type: 'buffer', bookType: 'xlsx' }), { type: 'buffer' }));
+});
+
+test('quantity exports as numeric cells with zero-decimal formatting and preserves missing values', async () => {
+  const { context, run } = loadApp();
+  context.rows = [7, 0, -2, 1.5, Number.MAX_SAFE_INTEGER].map(quantityNumber => ({ quantityNumber, quantity: String(quantityNumber) }));
+  context.rows.push({ quantity: '' }, { quantity: 'bad' }, { quantity: '1,234' });
+  let exported;
+  context.window.XLSX.writeFile = workbook => { exported = workbook; };
+  run('state.filteredRows = rows');
+  await run('downloadDetailWorkbook()');
+  const reopened = XLSX.read(XLSX.write(exported, { type: 'buffer', bookType: 'xlsx' }), { type: 'buffer', cellNF: true });
+  const sheet = reopened.Sheets[reopened.SheetNames[0]];
+  for (const [i, value] of [7, 0, -2, 1.5, Number.MAX_SAFE_INTEGER].entries()) {
+    assert.equal(sheet[`H${i + 2}`].t, 'n');
+    assert.equal(sheet[`H${i + 2}`].v, value);
+    assert.equal(sheet[`H${i + 2}`].z, '0');
+    assert(!sheet[`H${i + 2}`].w.includes('.'));
+  }
+  assert.equal(sheet.H7.v, '');
+  assert.equal(sheet.H8.v, '');
+  assert.equal(sheet.H9.v, 1234);
+  assert.match(run('buildDetailWorkbookStylesXml()'), /numFmtId="1"[^>]+applyNumberFormat="1"/);
 });
 
 test('same material merges across sheets with unique OA numbers, summed quantity and matching export', async () => {
@@ -124,7 +146,7 @@ test('same material merges across sheets with unique OA numbers, summed quantity
   assert.deepEqual(exported.SheetNames, ['备货需求分配明细']);
   const output = XLSX.utils.sheet_to_json(exported.Sheets['备货需求分配明细'], { header: 1 });
   assert.equal(output.length, 2);
-  assert.equal(output[1][output[0].indexOf('数量')], '10');
+  assert.equal(output[1][output[0].indexOf('数量')], 10);
   assert.equal(output[1][output[0].indexOf('OA备货流程号')], 'OA001/OA002');
   assert.equal(output[1][output[0].indexOf('采购单订单号')], '');
 });
@@ -205,7 +227,7 @@ test('workbook import, rows, metrics, minimum-order comparison and export use de
   await run('downloadDetailWorkbook()');
   const output = XLSX.utils.sheet_to_json(exported.Sheets[exported.SheetNames[0]], { header: 1 });
   const index = output[0].indexOf('数量');
-  assert.deepEqual(output.slice(1).map(row => row[index]), ['7', '3', '0']);
+  assert.deepEqual(output.slice(1).map(row => row[index]), [7, 3, 0]);
   run('state.filteredRows = [{ quantityNumber: NaN }]; updateDemandMetrics()');
   assert.equal(elements.get('#beihuoTotal').textContent, '待核对');
   assert.equal(elements.get('#quantityTotal').textContent, '数量合计：0（1 条数量待核对）');

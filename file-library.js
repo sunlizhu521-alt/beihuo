@@ -1014,9 +1014,19 @@ async function downloadDetailWorkbook() {
   const workbook = window.XLSX.utils.book_new();
   const sheetRows = [
     DETAIL_COLUMNS.map((column) => column.label),
-    ...state.filteredRows.map((row) => DETAIL_COLUMNS.map((column) => row[column.key] || "")),
+    ...state.filteredRows.map((row) => DETAIL_COLUMNS.map((column) => {
+      if (column.key !== "quantity") return row[column.key] || "";
+      const quantity = Number.isFinite(row.quantityNumber)
+        ? row.quantityNumber : getDemandRowQuantity([row.quantity], { quantity: 0 });
+      return Number.isFinite(quantity) ? quantity : "";
+    })),
   ];
   const worksheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
+  const quantityColumn = DETAIL_COLUMNS.findIndex((column) => column.key === "quantity");
+  for (let rowIndex = 1; rowIndex < sheetRows.length; rowIndex += 1) {
+    const cell = worksheet[window.XLSX.utils.encode_cell({ r: rowIndex, c: quantityColumn })];
+    if (cell?.t === "n") cell.z = "0";
+  }
   worksheet["!cols"] = getAutoExportColumns(sheetRows);
   window.XLSX.utils.book_append_sheet(workbook, worksheet, "备货需求分配明细");
   const sheetShapes = [{ rowCount: sheetRows.length, columnCount: DETAIL_COLUMNS.length }];
@@ -1081,11 +1091,12 @@ function buildDetailWorkbookStylesXml() {
     </border>
   </borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="4">
+  <cellXfs count="5">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
   <dxfs count="0"/>
@@ -1103,11 +1114,12 @@ function styleDetailWorksheetXml(xml, shape) {
   if (!sheetData) return xml;
 
   const wrapColumnIndex = DETAIL_COLUMNS.findIndex((column) => column.key === "stockReason") + 1;
+  const quantityColumnIndex = DETAIL_COLUMNS.findIndex((column) => column.key === "quantity") + 1;
   for (let rowIndex = 1; rowIndex <= shape.rowCount; rowIndex += 1) {
     const row = ensureWorksheetRow(documentXml, sheetData, rowIndex);
     for (let columnIndex = 1; columnIndex <= shape.columnCount; columnIndex += 1) {
       const cell = ensureWorksheetCell(documentXml, row, rowIndex, columnIndex);
-      const styleId = rowIndex === 1 ? "1" : columnIndex === wrapColumnIndex ? "3" : "2";
+      const styleId = rowIndex === 1 ? "1" : columnIndex === quantityColumnIndex ? "4" : columnIndex === wrapColumnIndex ? "3" : "2";
       cell.setAttribute("s", styleId);
     }
   }
