@@ -98,6 +98,38 @@ test('quantity exports as numeric cells with zero-decimal formatting and preserv
   assert.match(run('buildDetailWorkbookStylesXml()'), /numFmtId="1"[^>]+applyNumberFormat="1"/);
 });
 
+test('purchase division reads only exact product-line sheet and rejects missing sheets', async () => {
+  const { context, run } = loadApp();
+  const record = sheets => {
+    const workbook = XLSX.utils.book_new();
+    for (const [name, rows] of sheets) XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), name);
+    const bytes = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return { name: 'synthetic.xlsx', file: { name: 'synthetic.xlsx', arrayBuffer: async () => bytes } };
+  };
+  const header = ['物料编码', '采购单订单下单人', '供应商简称', '', '', '', '', '', '', '起订量'];
+  context.records = {
+    demand: record([['需求', [['识别码', '数量'], ['TEST-A', 7], ['OLD-ONLY', 0]]]]),
+    purchaseDivision: record([
+      ['旧表', [header, ['TEST-A', '旧人', '旧供应商', '', '', '', '', '', '', 99], ['OLD-ONLY', '旧人', '旧供应商']]],
+      ['产品线明细', [header, ['TEST-A', '新人', '新供应商', '', '', '', '', '', '', 0]]],
+      ['产品线明细备份', [header, ['TEST-A', '备份人', '备份供应商', '', '', '', '', '', '', 88]]],
+    ]),
+  };
+  const rows = await run('buildDemandAllocationRows(records)');
+  assert.equal(rows[0].buyer, '新人');
+  assert.equal(rows[0].supplierShortName, '新供应商');
+  assert.equal(rows[0].minimumOrderQuantity, '0');
+  assert.equal(rows[1].materialCodeValid, '否');
+  assert.equal(rows[1].buyer, '');
+  context.records.purchaseDivision = record([['产品线明细备份', [header]]]);
+  await assert.rejects(run('buildDemandAllocationRows(records)'), /缺少“产品线明细”工作表/);
+  context.records.purchaseDivision = record([['产品线明细', []]]);
+  const empty = await run('buildDemandAllocationRows(records)');
+  assert(empty.every(row => row.materialCodeValid === '否' && row.buyer === '' && row.minimumOrderQuantity === ''));
+  context.records.purchaseDivision = null;
+  assert.equal((await run('buildDemandAllocationRows(records)')).length, 2);
+});
+
 test('same material merges across sheets with unique OA numbers, summed quantity and matching export', async () => {
   const { context, elements, run } = loadApp();
   const workbook = XLSX.utils.book_new();

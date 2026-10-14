@@ -325,6 +325,11 @@ async function refreshDemandDashboard() {
   } catch (error) {
     console.warn("build demand allocation failed", error);
     state.demandRows = [];
+    resetAllFilterState();
+    renderDemandDashboard();
+    if (els.detailEmpty) els.detailEmpty.textContent = error.message || "读取失败，请检查上传文件。";
+    setLibraryState("读取失败");
+    return;
   }
   rebuildFilterOptions();
   pruneFilterSelections();
@@ -334,7 +339,7 @@ async function refreshDemandDashboard() {
 async function buildDemandAllocationRows(records) {
   const [categoryRows, divisionRows, rosterRows, demandRows] = await Promise.all([
     readTableRows(records.category, "Dim-YL医疗器械商品分类"),
-    readTableRows(records.purchaseDivision),
+    readTableRows(records.purchaseDivision, "产品线明细", true),
     readTableRows(records.roster),
     readTableRows(records.demand),
   ]);
@@ -455,10 +460,13 @@ function mergeDemandRowsByMaterial(rows) {
   });
 }
 
-async function readTableRows(record, preferredSheetName = "") {
+async function readTableRows(record, preferredSheetName = "", exactSheetOnly = false) {
   if (!record) return [];
   const workbook = await readWorkbook(record.file);
-  const sheetNames = getOrderedSheetNames(workbook, preferredSheetName);
+  if (exactSheetOnly && !workbook.SheetNames.includes(preferredSheetName)) {
+    throw new Error(`${record.name || "上传文件"} 缺少“${preferredSheetName}”工作表，请检查后重新上传并应用。`);
+  }
+  const sheetNames = exactSheetOnly ? [preferredSheetName] : getOrderedSheetNames(workbook, preferredSheetName);
   return sheetNames.map((sheetName) => ({
     rows: sheetToRows(workbook.Sheets[sheetName]),
     source: {
@@ -576,7 +584,7 @@ function buildPurchaseDivisionIndex(tables) {
 function buildMinimumOrderIndex(tables) {
   const byMaterial = new Map();
   tables
-    .filter((table) => String(table.source?.sheetName || "").trim().includes("产品线明细"))
+    .filter((table) => table.source?.sheetName === "产品线明细")
     .forEach(({ rows }) => {
       const headerIndex = findHeaderRowIndex(rows, TABLE_FIELD_ALIASES.divisionMaterialCode, 1);
       const columnMap = headerIndex >= 0
